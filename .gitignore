@@ -1,0 +1,20 @@
+# Ambientes virtuais
+venv/
+.env
+__pycache__/
+*.pyc
+*.pyo
+
+# Logs e dados locais
+data/
+*.log
+
+# Relatórios gerados
+reports/
+
+# Arquivos temporários de sistema
+.DS_Store
+Thumbs.db
+
+# Arquivos do VSCode (opcional)
+.vscode/
