@@ -1,38 +1,48 @@
-from datetime import datetime
-import csv
-from pathlib import Path
+# src/logic/leitor_codigo.py
 
-# Caminho onde os apontamentos serão salvos
-APONTAMENTOS_PATH = Path("data/apontamentos.csv")
-APONTAMENTOS_PATH.parent.mkdir(parents=True, exist_ok=True)
+from database.conexao import conectar
+from database.conexao import conectar_novo_banco
+import pandas as pd
 
-def registrar_leitura(codigo_barras: str, op_codigo: str = "", id_produto: int = 0, nome_produto: str = ""):
+def registrar_leitura(codigo_barras: str, cod_op: str) -> bool:
     """
-    Registra uma leitura de código de barras com data/hora atual e ID Sequencial.
+    Registra a leitura de um código de barras para a OP selecionada e verifica se o código de barras
+    já foi registrado.
+
     Parâmetros:
-        codigo_barras (str): Código de barras lido (via scanner ou digitado)
-        op_codigo (str): Código da ordem de produção (opcional)
-        id_produto (int): ID do produto (opcional)
-        nome_produto (str): Nome do produto (opcional)
+        codigo_barras (str): Código de barras do produto.
+        cod_op (str): Código da ordem de produção (OP).
+
+    Retorna:
+        bool: True se a leitura foi registrada com sucesso, False caso contrário.
     """
-    agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn = conectar_novo_banco()  # Usando a nova conexão com o banco
+    if not conn:
+        return False
 
-    # Recupera o último ID de leitura (incrementa a partir disso)
-    if APONTAMENTOS_PATH.exists():
-        with open(APONTAMENTOS_PATH, mode="r", encoding="utf-8") as f:
-            linhas = list(csv.reader(f))
-            id_leitura = int(linhas[-1][0]) if len(linhas) > 1 else 0
-    else:
-        id_leitura = 0
+    try:
+        # Verificar se o código de barras já foi registrado para a OP selecionada
+        sql_verificar = f"""
+            SELECT COUNT(*) FROM LEITURA_PRODUTO
+            WHERE CODIGO_BARRAS = '{codigo_barras}' AND COD_OP = '{cod_op}'
+        """
+        df = pd.read_sql(sql_verificar, conn)
+        if df.iloc[0, 0] > 0:
+            print("[ERRO] Código de barras já registrado para esta OP.")
+            return False
 
-    novo_id = id_leitura + 1
-    linha = [novo_id, agora, codigo_barras, op_codigo, id_produto, nome_produto]
+        # Registrar o código de barras
+        sql_inserir = f"""
+            INSERT INTO LEITURA_PRODUTO (CODIGO_BARRAS, COD_OP, QUANTIDADE, STATUS)
+            VALUES ('{codigo_barras}', '{cod_op}', 1, 'Registrado')
+        """
+        conn.execute(sql_inserir)
+        conn.commit()
+        print(f"[OK] Leitura registrada: Código: {codigo_barras} | OP: {cod_op}")
+        return True
 
-    escrever_cabecalho = not APONTAMENTOS_PATH.exists()
-    with open(APONTAMENTOS_PATH, mode="a", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        if escrever_cabecalho:
-            writer.writerow(["id_leitura", "data_hora", "codigo_barras", "codigo_op", "id_produto", "nome_produto"])
-        writer.writerow(linha)
-
-    print(f"[OK] Leitura registrada: ID={novo_id} | Código: {codigo_barras} | Hora: {agora}")
+    except Exception as e:
+        print(f"[ERRO] Falha ao registrar leitura: {e}")
+        return False
+    finally:
+        conn.close()

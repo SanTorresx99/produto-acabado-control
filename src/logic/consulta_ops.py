@@ -1,4 +1,5 @@
-from database.conexao import conectar
+# src/logic/consulta_ops.py
+from database.conexao import conectar  # Certifique-se de usar a função conectar do banco correto
 import pandas as pd
 
 def carregar_ops(data_inicio: str) -> pd.DataFrame:
@@ -11,7 +12,7 @@ def carregar_ops(data_inicio: str) -> pd.DataFrame:
     Retorna:
         pd.DataFrame: Tabela com as OPs programadas para a data informada
     """
-    conn = conectar()
+    conn = conectar()  # A função conectar() já deve usar o banco de dados correto (MENTOR.FDB)
     if not conn:
         return pd.DataFrame()
 
@@ -47,6 +48,7 @@ def carregar_ops(data_inicio: str) -> pd.DataFrame:
     try:
         df = pd.read_sql(sql, conn)
         print(f"[OK] {len(df)} OPs carregadas a partir de {data_inicio}")
+        print(f"Colunas carregadas: {df.columns}")  # Adicionando para verificar as colunas
         return df
     except Exception as e:
         print("[ERRO] Falha na leitura das OPs:", e)

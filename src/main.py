@@ -1,103 +1,95 @@
+# src/main.py
 import sys
 import os
-import pandas as pd
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'src')))
 from logic.consulta_ops import carregar_ops
 from logic.leitor_codigo import registrar_leitura
-
-def limpar_codigo_barras(texto: str) -> str:
-    return ''.join(filter(str.isdigit, texto.strip()))
-
-def selecionar_item(lista: list, titulo: str) -> str:
-    print(f"\n=== {titulo.upper()} DISPONÍVEIS ===")
-    for idx, item in enumerate(lista):
-        print(f"[{idx}] {item}")
-    while True:
-        escolha = input(f"\nSelecione um {titulo.lower()}: ").strip()
-        if escolha.isdigit() and int(escolha) in range(len(lista)):
-            return lista[int(escolha)]
-        else:
-            print("[!] Opção inválida. Tente novamente.")
-
-def selecionar_op(df_ops: pd.DataFrame) -> dict:
-    print("\n=== OPs disponíveis ===")
-    for idx, row in df_ops.iterrows():
-        print(f"[{idx}] OP: {row['CODIGO_OP']} | Produto: {row['NOME_PRODUTO']} | Prevista: {row['DATA_PREVISTA']} | Qtde: {row['QTD_PREVISTA']}")
-    while True:
-        escolha = input("\nDigite o número da OP para iniciar conferência: ").strip()
-        if escolha.isdigit() and int(escolha) in df_ops.index:
-            return df_ops.loc[int(escolha)].to_dict()
-        else:
-            print("[!] Opção inválida. Tente novamente.")
-
-def iniciar_contagem(op_selecionada: dict, df_filtrado: pd.DataFrame):
-    print(f"\n>>> Iniciando leitura para OP {op_selecionada['CODIGO_OP']} | Produto: {op_selecionada['NOME_PRODUTO']}")
-    print("Digite ou escaneie o código de barras (ou 'sair' para encerrar):\n")
-
-    codigos_validos = df_filtrado[
-        df_filtrado['CODIGO_OP'] == op_selecionada['CODIGO_OP']
-    ]['CODIGO_BARRAS'].dropna().unique().tolist()
-
-    quantidade_maxima = int(op_selecionada['QTD_PREVISTA']) or 0
-    contador = 0
-
-    while True:
-        if contador >= quantidade_maxima:
-            print(f"\n[⚠️] Limite de {quantidade_maxima} unidades atingido para esta OP.")
-            break
-
-        raw = input(f"[{contador+1}/{quantidade_maxima}] Código: ").strip()
-        if raw.lower() == 'sair':
-            print("Contagem encerrada pelo usuário.")
-            break
-
-        codigo = limpar_codigo_barras(raw)
-        if not codigo:
-            print("[!] Código inválido. Tente novamente.")
-            continue
-
-        if codigo not in codigos_validos:
-            print(f"[!] Código {codigo} não pertence ao produto da OP selecionada.")
-            continue
-
-        registrar_leitura(
-            codigo_barras=codigo,
-            op_codigo=str(op_selecionada['CODIGO_OP']),
-            id_produto=int(op_selecionada['ID_PRODUTO']),
-            nome_produto=op_selecionada['NOME_PRODUTO']
-        )
-        contador += 1
+from logic.validacoes import validar_qtd
 
 def main():
+    print("=== SISTEMA DE APONTAMENTO DE PRODUÇÃO ===")
+
     while True:
-        print("\n=== SISTEMA DE APONTAMENTO DE PRODUÇÃO ===\n")
-        data = input("Informe a data da OP (YYYY-MM-DD ou 'sair' para encerrar): ").strip()
-        if data.lower() == 'sair':
-            print("Encerrando o sistema.")
+        # Passo 1: Solicitar a data da OP
+        data = input("Informe a data da OP (YYYY-MM-DD ou 'sair' para encerrar): ")
+        if data.lower() == "sair":
+            print("[INFO] Encerrando sistema.")
             break
 
-        df_ops = carregar_ops(data)
+        print(f"[INFO] Carregando OPs para a data {data}...")
 
-        if df_ops.empty:
-            print(f"[!] Nenhuma OP encontrada para {data}")
+        # Carregar OPs da data selecionada
+        ops_disponiveis = carregar_ops(data)
+        if ops_disponiveis.empty:
+            print("[ERRO] Nenhuma OP encontrada para a data informada.")
             continue
 
-        especies = sorted(df_ops['ESPECIE'].dropna().unique().tolist())
-        especie_sel = selecionar_item(especies, "espécie")
+        # Passo 2: Verificar as colunas carregadas
+        print(f"Colunas carregadas: {ops_disponiveis.columns}")  # Adicionando para verificar as colunas
 
-        df_filtrado = df_ops[df_ops['ESPECIE'] == especie_sel]
+        # Passo 3: Filtragem por Espécie (caso seja necessário)
+        print("\n=== ESPÉCIE DISPONÍVEIS ===")
+        for idx, especie in enumerate(ops_disponiveis['ESPECIE'].unique(), 1):  # Alterado aqui
+            print(f"[{idx}] {especie}")
+        especie_escolhida = int(input(f"Selecione uma espécie ou 0 para ignorar: "))
+        if especie_escolhida == 0:
+            print("[OK] Ignorando espécie.")
+        else:
+            especie_selecionada = ops_disponiveis['ESPECIE'].unique()[especie_escolhida - 1]  # Alterado aqui
+            print(f"[OK] Espécie selecionada: {especie_selecionada}")
+            ops_disponiveis = ops_disponiveis[ops_disponiveis['ESPECIE'] == especie_selecionada]  # Alterado aqui
+            print(f"[INFO] Número de OPs filtradas para a espécie {especie_selecionada}: {len(ops_disponiveis)}")
 
-        subespecies = sorted(df_filtrado['SUB_ESPECIE'].dropna().unique().tolist())
-        if subespecies:
-            sub_sel = selecionar_item(subespecies, "subespécie")
-            df_filtrado = df_filtrado[df_filtrado['SUB_ESPECIE'] == sub_sel]
+        # Passo 4: Filtragem por Subespécie (caso seja necessário)
+        print("\n=== SUBESPÉCIE DISPONÍVEIS ===")
+        for idx, subesp in enumerate(ops_disponiveis['SUB_ESPECIE'].unique(), 1):  # Alterado aqui
+            print(f"[{idx}] {subesp}")
+        subesp_escolhida = int(input(f"Selecione uma subespécie ou 0 para ignorar: "))
+        if subesp_escolhida == 0:
+            print("[OK] Ignorando subespécie.")
+        else:
+            subesp_selecionada = ops_disponiveis['SUB_ESPECIE'].unique()[subesp_escolhida - 1]  # Alterado aqui
+            print(f"[OK] Subespécie selecionada: {subesp_selecionada}")
+            ops_disponiveis = ops_disponiveis[ops_disponiveis['SUB_ESPECIE'] == subesp_selecionada]  # Alterado aqui
+            print(f"[INFO] Número de OPs filtradas para a subespécie {subesp_selecionada}: {len(ops_disponiveis)}")
 
-        if df_filtrado.empty:
-            print("[!] Nenhuma OP encontrada com os filtros aplicados.")
+        # Passo 5: Seleção da OP para conferência
+        print("\n=== OPs disponíveis ===")
+        for idx, op in enumerate(ops_disponiveis['CODIGO_OP'].unique(), 1):
+            produto = ops_disponiveis[ops_disponiveis['CODIGO_OP'] == op]['NOME_PRODUTO'].iloc[0]
+            qtd = ops_disponiveis[ops_disponiveis['CODIGO_OP'] == op]['QTD_PREVISTA'].iloc[0]
+            print(f"[{idx}] OP: {op} | Produto: {produto} | Qtde: {qtd}")
+
+        op_escolhida = int(input(f"Digite o número da OP para iniciar conferência ou 0 para pular: "))
+        if op_escolhida == 0:
+            print("[OK] Ignorando OP.")
             continue
 
-        df_filtrado.reset_index(drop=True, inplace=True)
-        op = selecionar_op(df_filtrado)
-        iniciar_contagem(op, df_filtrado)
+        op_selecionada = ops_disponiveis.iloc[op_escolhida - 1]
+        cod_op = op_selecionada['CODIGO_OP']
+        produto = op_selecionada['NOME_PRODUTO']
+        qtd_prevista = op_selecionada['QTD_PREVISTA']
+
+        print(f"[OK] OP selecionada: {cod_op} | Produto: {produto} | Qtde: {qtd_prevista}")
+
+        # Passo 6: Leitura do código de barras
+        qtd_registrada = 0
+        while qtd_registrada < qtd_prevista:
+            codigo_barras = input(f"Digite ou escaneie o código de barras do produto (ou 'sair' para encerrar): ")
+            if codigo_barras.lower() == "sair":
+                print("[INFO] Encerrando conferência.")
+                break
+
+            # Verificar se o código de barras é válido
+            if registrar_leitura(codigo_barras, cod_op):
+                qtd_registrada += 1
+                print(f"[INFO] {qtd_registrada}/{qtd_prevista} registrados.")
+            else:
+                print("[ERRO] Código de barras inválido ou já registrado.")
+
+            if qtd_registrada >= qtd_prevista:
+                print(f"[INFO] Quantidade máxima de {qtd_prevista} já registrada para esta OP.")
+                break
 
 if __name__ == "__main__":
     main()
