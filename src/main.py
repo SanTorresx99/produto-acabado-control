@@ -1,9 +1,8 @@
-# src/main.py
 import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'src')))
 from logic.consulta_ops import carregar_ops
-from logic.leitor_codigo import registrar_leitura
+from logic.leitor_codigo import registrar_leitura, registrar_op
 from logic.validacoes import validar_qtd
 
 def main():
@@ -69,6 +68,14 @@ def main():
         cod_op = op_selecionada['CODIGO_OP']
         produto = op_selecionada['NOME_PRODUTO']
         qtd_prevista = op_selecionada['QTD_PREVISTA']
+        id_produto = op_selecionada['ID_PRODUTO']
+        cod_barras = op_selecionada['CODIGO_BARRAS']
+
+        # Registrar a OP no banco de controle
+        if registrar_op(cod_op, produto, qtd_prevista, op_selecionada['ESPECIE'], op_selecionada['SUB_ESPECIE'], id_produto, cod_barras):
+            print(f"[OK] OP {cod_op} registrada no banco de controle.")
+        else:
+            print(f"[INFO] OP {cod_op} já registrada no banco de controle.")
 
         print(f"[OK] OP selecionada: {cod_op} | Produto: {produto} | Qtde: {qtd_prevista}")
 
@@ -81,7 +88,7 @@ def main():
                 break
 
             # Verificar se o código de barras é válido
-            if registrar_leitura(codigo_barras, cod_op):
+            if registrar_leitura(codigo_barras, cod_op, qtd_prevista):
                 qtd_registrada += 1
                 print(f"[INFO] {qtd_registrada}/{qtd_prevista} registrados.")
             else:

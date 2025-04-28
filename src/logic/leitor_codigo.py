@@ -1,6 +1,43 @@
 from database.conexao import conectar_novo_banco
 import pandas as pd
 
+def registrar_op(cod_op, nome_produto, qtd_prevista, especie, sub_especie, id_produto, cod_barras):
+    """
+    Registra a OP na tabela OPS no banco de controle.
+    """
+    conn = conectar_novo_banco()  # Usando a conexão com o banco de controle
+    if not conn:
+        return False
+
+    try:
+        # Verifica se a OP já está registrada
+        sql_verificar_op = f"""
+            SELECT COUNT(*) 
+            FROM OPS 
+            WHERE CODIGO_OP = '{cod_op}'
+        """
+        cursor = conn.cursor()
+        cursor.execute(sql_verificar_op)
+        count = cursor.fetchone()[0]
+
+        # Se a OP não existe, insere na tabela
+        if count == 0:
+            sql_inserir_op = f"""
+                INSERT INTO OPS (CODIGO_OP, NOME_PRODUTO, QTD_PREVISTA, DATA_PREVISTA, ESPECIE, SUB_ESPECIE, ID_PRODUTO, COD_BARRAS)
+                VALUES ('{cod_op}', '{nome_produto}', {qtd_prevista}, CURRENT_TIMESTAMP, '{especie}', '{sub_especie}', {id_produto}, '{cod_barras}')
+            """
+            cursor.execute(sql_inserir_op)
+            conn.commit()
+            print(f"[OK] OP {cod_op} registrada com sucesso.")
+        else:
+            print(f"[INFO] OP {cod_op} já registrada.")
+        return True
+    except Exception as e:
+        print(f"[ERRO] Falha ao registrar OP: {e}")
+        return False
+    finally:
+        conn.close()
+
 def verificar_codigo_pertencente_op(codigo_barras, cod_op):
     """
     Verifica se o código de barras pertence à OP selecionada no banco ERP.
