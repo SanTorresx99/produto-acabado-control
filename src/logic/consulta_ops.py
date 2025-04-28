@@ -40,14 +40,14 @@ def carregar_ops(data_inicio: str) -> pd.DataFrame:
         LEFT JOIN especie e ON e.id_especie = p.id_especie
         LEFT JOIN sub_especie se ON se.id_sub_especie = p.id_sub_especie
 
-        WHERE CAST(opp.data_prev_inicio AS DATE) = '{data_inicio}'
+        WHERE CAST(opp.data_prev_inicio AS DATE) like '{data_inicio}%'
 
         ORDER BY opp.id_os_producao_linha_prod DESC
     """
 
     try:
         df = pd.read_sql(sql, conn)
-        print(f"[OK] {len(df)} OPs carregadas a partir de {data_inicio}")
+        print(f"[OK] {len(df)} OPs carregadas de {data_inicio}")
         print(f"Colunas carregadas: {df.columns}")  # Adicionando para verificar as colunas
         return df
     except Exception as e:
