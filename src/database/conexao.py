@@ -1,3 +1,4 @@
+#src/database/conexao.py
 import os
 from firebird.driver import connect
 from dotenv import load_dotenv
@@ -19,9 +20,11 @@ def conectar():
 
 def conectar_novo_banco():
     try:
-        # Altere o caminho para o novo banco de dados
+        # Imprimir o caminho sendo utilizado para depuração
+        db_path = os.getenv("FIREBIRD_NEW_DSN")
+        print(f"[DEBUG] Tentando conectar ao banco: {db_path}")
         con = connect(
-            database=os.getenv("FIREBIRD_NEW_DSN"),  # Nome do novo banco
+            database=db_path,
             user=os.getenv("FIREBIRD_USER"),
             password=os.getenv("FIREBIRD_PASSWORD"),
         )
@@ -29,4 +32,7 @@ def conectar_novo_banco():
         return con
     except Exception as e:
         print("[ERRO] Falha na conexão com o novo banco:", e)
+        # Adicione verificações específicas para diagnóstico
+        if not os.getenv("FIREBIRD_NEW_DSN"):
+            print("[ERRO] Variável FIREBIRD_NEW_DSN não encontrada no arquivo .env")
         return None
