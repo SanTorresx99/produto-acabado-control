@@ -1,5 +1,11 @@
-from database.conexao import conectar  # Certifique-se de usar a função conectar do banco correto
+# src/logic/consulta_ops.py
+
 import pandas as pd
+import os
+from datetime import datetime
+
+# Caminho do arquivo CSV onde os registros das OPs são salvos
+REGISTROS_CSV_PATH = os.path.join(os.path.dirname(__file__), '..', 'files', 'registros.csv')
 
 def carregar_ops(data_inicio: str) -> pd.DataFrame:
     """
@@ -11,46 +17,83 @@ def carregar_ops(data_inicio: str) -> pd.DataFrame:
     Retorna:
         pd.DataFrame: Tabela com as OPs programadas para a data informada
     """
-    conn = conectar()  # A função conectar() já deve usar o banco de dados correto (MENTOR.FDB)
-    if not conn:
-        return pd.DataFrame()
-
-    sql = f"""
-        SELECT
-        pp.id_periodo_producao AS id_period,
-        opp.id_os_producao_linha_prod AS id_os,
-        opp.codigo AS codigo_op,
-        opp.data_prev_inicio AS data_prevista,
-        REPLACE(e.nome, 'PRODUTO ACABADO -', '') AS especie,
-        se.nome AS sub_especie,
-        p.id_produto,
-        p.nome AS nome_produto,
-        opp.quantidade_ref_prev_prod AS qtd_prevista,
-        cb.codigo_barras,
-        sopp.codigo_barras AS cod_op
-
-        FROM os_producao_linha_prod opp
-        LEFT JOIN grade_cor gc ON gc.id_grade_cor = opp.id_grade_cor
-        LEFT JOIN produto_grade pg ON pg.id_produto_grade = gc.id_produto_grade
-        LEFT JOIN produto p ON p.id_produto = pg.id_produto
-        LEFT JOIN codigo_barras cb ON cb.id_produto = p.id_produto
-        LEFT JOIN subdivisao_os_prod_linha_prod sopp ON sopp.id_ordem_serv_prod_linha = opp.id_os_producao_linha_prod
-        LEFT JOIN periodo_producao pp ON pp.id_periodo_producao = opp.id_periodo_producao
-        LEFT JOIN especie e ON e.id_especie = p.id_especie
-        LEFT JOIN sub_especie se ON se.id_sub_especie = p.id_sub_especie
-
-        WHERE CAST(opp.data_prev_inicio AS DATE) like '{data_inicio}%' 
-
-        ORDER BY opp.id_os_producao_linha_prod DESC
-    """
-
     try:
-        df = pd.read_sql(sql, conn)
-        print(f"[OK] {len(df)} OPs carregadas de {data_inicio}")
-        print(f"Colunas carregadas: {df.columns}")  # Adicionando para verificar as colunas
-        return df
+        # Simulação de carregamento de dados das OPs do ERP (seria substituída por uma consulta real ao banco de dados MENTOR)
+        # Aqui estamos simulando os dados das OPs. Em um ambiente real, deve-se carregar os dados do ERP.
+
+        # Exemplo de dados (substituir com consulta real ao banco)
+        ops_data = {
+            'ID_PERIOD': [1, 2, 3],
+            'ID_OS': [101, 102, 103],
+            'CODIGO_OP': ['168343', '168344', '168345'],
+            'DATA_PREVISTA': ['2025-04-03', '2025-04-04', '2025-04-05'],
+            'ESPECIE': ['ESTOFADOS', 'CAMAS', 'COLCHAO MOLA'],
+            'SUB_ESPECIE': ['ESTOFADO 3 LUGARES', 'CAMA SIMPLES', 'COLCHÃO MOLA'],
+            'ID_PRODUTO': [1, 2, 3],
+            'NOME_PRODUTO': ['Estofado Modelo A', 'Cama Modelo B', 'Colchão Mola C'],
+            'QTD_PREVISTA': [500, 300, 200],
+            'CODIGO_BARRAS': ['7899600724613', '7899600758571', '7899600771234'],
+            'COD_OP': ['168343', '168344', '168345']
+        }
+
+        ops_df = pd.DataFrame(ops_data)
+
+        # Filtrando os dados conforme a data informada
+        ops_df['DATA_PREVISTA'] = pd.to_datetime(ops_df['DATA_PREVISTA'])
+        ops_df = ops_df[ops_df['DATA_PREVISTA'] == pd.to_datetime(data_inicio)]
+
+        print(f"[OK] {len(ops_df)} OPs carregadas de {data_inicio}")
+        return ops_df
+
     except Exception as e:
-        print("[ERRO] Falha na leitura das OPs:", e)
+        print(f"[ERRO] Falha ao carregar OPs: {e}")
         return pd.DataFrame()
-    finally:
-        conn.close()
+
+
+def registrar_op(cod_op: str, nome_produto: str, qtd_prevista: float, especie: str, sub_especie: str, id_produto: int, cod_barras: str):
+    """
+    Registra uma nova OP no arquivo CSV 'registros.csv'.
+
+    Parâmetros:
+        cod_op (str): Código da OP.
+        nome_produto (str): Nome do produto da OP.
+        qtd_prevista (float): Quantidade prevista para a OP.
+        especie (str): Espécie do produto.
+        sub_especie (str): Subespécie do produto.
+        id_produto (int): ID do produto.
+        cod_barras (str): Código de barras do produto.
+    """
+    try:
+        # Verificar se o arquivo de registros já existe, caso contrário, criar com cabeçalhos
+        if os.path.exists(REGISTROS_CSV_PATH):
+            registros_df = pd.read_csv(REGISTROS_CSV_PATH)
+        else:
+            registros_df = pd.DataFrame(columns=['COD_OP', 'NOME_PRODUTO', 'QTD_REGISTRADA', 'ESPECIE', 'SUB_ESPECIE', 'ID_PRODUTO', 'COD_BARRAS', 'DATA_REGISTRO'])
+
+        # Verificar se a OP já foi registrada
+        if cod_op in registros_df['COD_OP'].values:
+            print(f"[INFO] OP {cod_op} já registrada anteriormente.")
+            return False
+
+        # Adicionar uma nova linha ao DataFrame de registros
+        nova_op = {
+            'COD_OP': cod_op,
+            'NOME_PRODUTO': nome_produto,
+            'QTD_REGISTRADA': 0,  # Inicialmente nenhuma quantidade registrada
+            'ESPECIE': especie,
+            'SUB_ESPECIE': sub_especie,
+            'ID_PRODUTO': id_produto,
+            'COD_BARRAS': cod_barras,
+            'DATA_REGISTRO': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
+
+        registros_df = registros_df.append(nova_op, ignore_index=True)
+
+        # Salvar os registros no arquivo CSV
+        registros_df.to_csv(REGISTROS_CSV_PATH, index=False)
+        print(f"[OK] OP {cod_op} registrada com sucesso no arquivo de registros.")
+        return True
+
+    except Exception as e:
+        print(f"[ERRO] Falha ao registrar OP: {e}")
+        return False

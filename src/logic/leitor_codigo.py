@@ -1,70 +1,65 @@
 # src/logic/leitor_codigo.py
-from database.conexao import conectar_novo_banco
+
 import pandas as pd
+import os
+from datetime import datetime
 
-def registrar_op(cod_op, nome_produto, qtd_prevista):
-    """
-    Registra a OP na tabela OPS do banco de dados controle_pa.fdb.
-    """
-    conn = conectar_novo_banco()  # Usando a conexão com o banco
-    if not conn:
-        return False
+# Caminho do arquivo CSV onde os registros das OPs são salvos
+REGISTROS_CSV_PATH = os.path.join(os.path.dirname(__file__), '..', 'files', 'registros.csv')
 
+def verificar_codigo_pertencente_op(codigo_barras, cod_op):
+    """
+    Verifica se o código de barras pertence à OP selecionada no banco ERP.
+    Retorna True se o código de barras pertencer à OP, e False caso contrário.
+    """
     try:
-        # Verificar se a OP já está registrada
-        sql_verificar_op = f"""
-            SELECT COUNT(*) FROM OPS WHERE CODIGO_OP = ?
-        """
-        cursor = conn.cursor()
-        cursor.execute(sql_verificar_op, (cod_op,))
-        count = cursor.fetchone()[0]
+        # Simulação de consulta ao banco de dados (substituir com a lógica real)
+        # Aqui estamos assumindo que o código de barras da OP é validado diretamente.
+        # No ambiente real, deverá ser feita uma consulta ao banco ERP para validar se o código de barras pertence à OP
 
-        if count == 0:  # Se a OP não estiver registrada, vamos registrá-la
-            sql_inserir_op = f"""
-                INSERT INTO OPS (CODIGO_OP, NOME_PRODUTO, QTD_PREVISTA, STATUS, COD_BARRAS)
-                VALUES (?, ?, ?, 'PENDENTE', ?)
-            """
-            cursor.execute(sql_inserir_op, (cod_op, nome_produto, qtd_prevista, ''))  # Inserir sem código de barras inicialmente
-            conn.commit()
-            print(f"[OK] OP {cod_op} registrada no banco.")
+        # Para simplificar, estamos assumindo que o código de barras pertence à OP se não estiver registrado previamente no arquivo de registros
+        registros_df = pd.read_csv(REGISTROS_CSV_PATH)
+        op_registrada = registros_df[registros_df['COD_OP'] == cod_op]
+        if not op_registrada.empty:
+            print(f"[OK] O código de barras {codigo_barras} pertence à OP {cod_op}.")
+            return True
         else:
-            print(f"[INFO] OP {cod_op} já está registrada.")
-
-        return True
+            print(f"[ERRO] O código de barras {codigo_barras} não pertence à OP {cod_op}.")
+            return False
 
     except Exception as e:
-        print(f"[ERRO] Falha ao registrar OP: {e}")
+        print(f"[ERRO] Falha ao verificar código de barras: {e}")
         return False
-    finally:
-        conn.close()
 
 
 def registrar_leitura(codigo_barras, cod_op, qtd_prevista):
     """
-    Registra a leitura do código de barras no banco de dados do projeto.
+    Registra a leitura do código de barras no arquivo CSV de registros.
     Realiza as verificações se o código pertence à OP e a quantidade já registrada.
-    """
-    conn = conectar_novo_banco()  # Usando a conexão com o novo banco
-    if not conn:
-        return False
 
+    Parâmetros:
+        codigo_barras (str): Código de barras do produto.
+        cod_op (str): Código da ordem de produção (OP).
+        qtd_prevista (float): Quantidade prevista para a OP.
+    """
     try:
-        # Passo 1: Verifica se a OP foi registrada, caso contrário, registra
-        if not registrar_op(cod_op, "", qtd_prevista):
-            print("[ERRO] OP não registrada. Abortando.")
+        # Passo 1: Verifica se o código de barras pertence à OP
+        if not verificar_codigo_pertencente_op(codigo_barras, cod_op):
             return False
 
-        # Passo 2: Verifica a quantidade registrada para essa OP
-        sql_verificar_qtd = f"""
-            SELECT COUNT(*) 
-            FROM LEITURA_PRODUTO
-            WHERE COD_OP = ? 
-        """
-        cursor = conn.cursor()
-        cursor.execute(sql_verificar_qtd, (cod_op,))
-        qtd_registrada = cursor.fetchone()[0]
+        # Passo 2: Verificar quantos registros já foram realizados dessa OP
+        registros_df = pd.read_csv(REGISTROS_CSV_PATH)
+        
+        # Verificar a quantidade registrada para essa OP
+        op_registrada = registros_df[registros_df['COD_OP'] == cod_op]
+        if op_registrada.empty:
+            # Se a OP não estiver registrada, criar a entrada
+            print(f"[INFO] OP {cod_op} não registrada, criando nova entrada.")
+            registrar_op(cod_op)
+            op_registrada = registros_df[registros_df['COD_OP'] == cod_op]  # Recarregar após o registro da OP
 
-        print(f"[INFO] Quantidade registrada: {qtd_registrada}/{qtd_prevista}")
+        qtd_registrada = op_registrada['QTD_REGISTRADA'].iloc[0]
+        print(f"[INFO] Quantidade registrada para OP {cod_op}: {qtd_registrada}/{qtd_prevista}")
 
         # Passo 3: Verifica se a quantidade registrada é menor que a prevista
         if qtd_registrada >= qtd_prevista:
@@ -73,18 +68,52 @@ def registrar_leitura(codigo_barras, cod_op, qtd_prevista):
                 print("[INFO] Parando a conferência.")
                 return False
 
-        # Passo 4: Registra o código de barras
-        sql_inserir = f"""
-            INSERT INTO LEITURA_PRODUTO (CODIGO_BARRAS, COD_OP, QUANTIDADE, STATUS)
-            VALUES (?, ?, ?, 'Registrado')
-        """
-        cursor.execute(sql_inserir, (codigo_barras, cod_op, 1))
-        conn.commit()
-        print(f"[OK] Leitura registrada: Código de barras {codigo_barras} | OP {cod_op}")
+        # Passo 4: Atualizar a quantidade registrada para a OP
+        registros_df.loc[registros_df['COD_OP'] == cod_op, 'QTD_REGISTRADA'] += 1
+        registros_df.to_csv(REGISTROS_CSV_PATH, index=False)
+
+        print(f"[OK] Leitura registrada: Código de barras {codigo_barras} | OP {cod_op} | Total registrado: {qtd_registrada + 1}")
         return True
 
     except Exception as e:
         print(f"[ERRO] Falha ao registrar leitura: {e}")
         return False
-    finally:
-        conn.close()
+
+
+def registrar_op(cod_op):
+    """
+    Registra uma nova OP no arquivo CSV 'registros.csv' quando a OP ainda não está registrada.
+
+    Parâmetros:
+        cod_op (str): Código da OP.
+    """
+    try:
+        # Carregar registros existentes
+        if os.path.exists(REGISTROS_CSV_PATH):
+            registros_df = pd.read_csv(REGISTROS_CSV_PATH)
+        else:
+            registros_df = pd.DataFrame(columns=['COD_OP', 'NOME_PRODUTO', 'QTD_REGISTRADA', 'ESPECIE', 'SUB_ESPECIE', 'ID_PRODUTO', 'COD_BARRAS', 'DATA_REGISTRO'])
+
+        # Adicionar a OP como não registrada inicialmente
+        nova_op = {
+            'COD_OP': cod_op,
+            'NOME_PRODUTO': 'Produto Não Identificado',
+            'QTD_REGISTRADA': 0,
+            'ESPECIE': 'Não Especificado',
+            'SUB_ESPECIE': 'Não Especificado',
+            'ID_PRODUTO': 0,
+            'COD_BARRAS': '',
+            'DATA_REGISTRO': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
+
+        # Adicionar a nova OP
+        registros_df = registros_df.append(nova_op, ignore_index=True)
+
+        # Salvar no arquivo CSV
+        registros_df.to_csv(REGISTROS_CSV_PATH, index=False)
+        print(f"[OK] OP {cod_op} registrada com sucesso no arquivo de registros.")
+        return True
+
+    except Exception as e:
+        print(f"[ERRO] Falha ao registrar OP: {e}")
+        return False

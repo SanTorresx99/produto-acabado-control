@@ -1,15 +1,31 @@
+# src/main.py
+
 import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'src')))
 from logic.consulta_ops import carregar_ops
+from logic.leitor_codigo import registrar_leitura
+from logic.usuario import autenticar_usuario  # Importando a função de autenticação
 from logic.validacoes import validar_qtd
-from logic.leitor_codigo import registrar_op  # Nova importação
 
 def main():
     print("=== SISTEMA DE APONTAMENTO DE PRODUÇÃO ===")
 
+    # Passo 1: Autenticação do usuário
+    print("Por favor, faça o login.")
+    login = input("Digite seu login: ")
+    senha = input("Digite sua senha: ")
+    
+    usuario = autenticar_usuario(login, senha)  # Função para autenticar o usuário
+    
+    if usuario is None:
+        print("[ERRO] Autenticação falhou. Encerrando sistema.")
+        return  # Encerra o sistema se o login falhar
+    else:
+        print(f"[OK] Bem-vindo, {usuario['NOME']}!")
+
     while True:
-        # Passo 1: Solicitar a data da OP
+        # Passo 2: Solicitar a data da OP
         data = input("Informe a data da OP (YYYY-MM-DD ou 'sair' para encerrar): ")
         if data.lower() == "sair":
             print("[INFO] Encerrando sistema.")
@@ -23,10 +39,10 @@ def main():
             print("[ERRO] Nenhuma OP encontrada para a data informada.")
             continue
 
-        # Passo 2: Verificar as colunas carregadas
+        # Passo 3: Verificar as colunas carregadas
         print(f"Colunas carregadas: {ops_disponiveis.columns}")  # Adicionando para verificar as colunas
 
-        # Passo 3: Filtragem por Espécie (caso seja necessário)
+        # Passo 4: Filtragem por Espécie (caso seja necessário)
         print("\n=== ESPÉCIE DISPONÍVEIS ===")
         for idx, especie in enumerate(ops_disponiveis['ESPECIE'].unique(), 1):  # Alterado aqui
             print(f"[{idx}] {especie}")
@@ -39,7 +55,7 @@ def main():
             ops_disponiveis = ops_disponiveis[ops_disponiveis['ESPECIE'] == especie_selecionada]  # Alterado aqui
             print(f"[INFO] Número de OPs filtradas para a espécie {especie_selecionada}: {len(ops_disponiveis)}")
 
-        # Passo 4: Filtragem por Subespécie (caso seja necessário)
+        # Passo 5: Filtragem por Subespécie (caso seja necessário)
         print("\n=== SUBESPÉCIE DISPONÍVEIS ===")
         for idx, subesp in enumerate(ops_disponiveis['SUB_ESPECIE'].unique(), 1):  # Alterado aqui
             print(f"[{idx}] {subesp}")
@@ -52,7 +68,7 @@ def main():
             ops_disponiveis = ops_disponiveis[ops_disponiveis['SUB_ESPECIE'] == subesp_selecionada]  # Alterado aqui
             print(f"[INFO] Número de OPs filtradas para a subespécie {subesp_selecionada}: {len(ops_disponiveis)}")
 
-        # Passo 5: Seleção da OP para conferência
+        # Passo 6: Seleção da OP para conferência
         print("\n=== OPs disponíveis ===")
         for idx, op in enumerate(ops_disponiveis['CODIGO_OP'].unique(), 1):
             produto = ops_disponiveis[ops_disponiveis['CODIGO_OP'] == op]['NOME_PRODUTO'].iloc[0]
@@ -71,12 +87,7 @@ def main():
 
         print(f"[OK] OP selecionada: {cod_op} | Produto: {produto} | Qtde: {qtd_prevista}")
 
-        # Registrar a OP no banco
-        if not registrar_op(cod_op, produto, qtd_prevista):
-            print("[ERRO] Falha ao registrar OP.")
-            continue
-
-        # Passo 6: Leitura do código de barras
+        # Passo 7: Leitura do código de barras
         qtd_registrada = 0
         while qtd_registrada < qtd_prevista:
             codigo_barras = input(f"Digite ou escaneie o código de barras do produto (ou 'sair' para encerrar): ")
