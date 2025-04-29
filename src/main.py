@@ -2,8 +2,8 @@ import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'src')))
 from logic.consulta_ops import carregar_ops
-from logic.leitor_codigo import registrar_leitura, registrar_op
 from logic.validacoes import validar_qtd
+from logic.leitor_codigo import registrar_op  # Nova importação
 
 def main():
     print("=== SISTEMA DE APONTAMENTO DE PRODUÇÃO ===")
@@ -68,16 +68,13 @@ def main():
         cod_op = op_selecionada['CODIGO_OP']
         produto = op_selecionada['NOME_PRODUTO']
         qtd_prevista = op_selecionada['QTD_PREVISTA']
-        id_produto = op_selecionada['ID_PRODUTO']
-        cod_barras = op_selecionada['CODIGO_BARRAS']
-
-        # Registrar a OP no banco de controle
-        if registrar_op(cod_op, produto, qtd_prevista, op_selecionada['ESPECIE'], op_selecionada['SUB_ESPECIE'], id_produto, cod_barras):
-            print(f"[OK] OP {cod_op} registrada no banco de controle.")
-        else:
-            print(f"[INFO] OP {cod_op} já registrada no banco de controle.")
 
         print(f"[OK] OP selecionada: {cod_op} | Produto: {produto} | Qtde: {qtd_prevista}")
+
+        # Registrar a OP no banco
+        if not registrar_op(cod_op, produto, qtd_prevista):
+            print("[ERRO] Falha ao registrar OP.")
+            continue
 
         # Passo 6: Leitura do código de barras
         qtd_registrada = 0
