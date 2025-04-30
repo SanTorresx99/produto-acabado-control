@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard Administrativo</title>
+</head>
+<body>
+    <h1>Dashboard Administrativo</h1>
+
+    <form method="get" action="/admin">
+        <label for="data">Data:</label>
+        <input type="date" id="data" name="data" value="{{ data_selecionada }}">
+
+        <label for="especie">Espécie:</label>
+        <select name="especie" id="especie">
+            <option value="todas">-- todas --</option>
+            {% for esp in especies %}
+                <option value="{{ esp }}" {% if esp == especie_selecionada %}selected{% endif %}>{{ esp }}</option>
+            {% endfor %}
+        </select>
+
+        <label for="subespecie">Subespécie:</label>
+        <select name="subespecie" id="subespecie">
+            <option value="todas">-- todas --</option>
+            {% for subesp in subespecies %}
+                <option value="{{ subesp }}" {% if subesp == subespecie_selecionada %}selected{% endif %}>{{ subesp }}</option>
+            {% endfor %}
+        </select>
+
+        <button type="submit">Buscar</button>
+    </form>
+
+    <h2>Resumo</h2>
+    <p>Total Previsto: {{ total_previsto }}</p>
+    <p>Total Registrado: {{ total_registrado }}</p>
+    <p>Percentual: {{ percentual }}%</p>
+
+    <h3>Por Espécie</h3>
+    <ul>
+        {% for linha in especie_detalhes %}
+            <li>{{ linha.ESPECIE }} - Previsto: {{ linha.QTD_PREVISTA }}, Registrado: {{ linha.QTD_REGISTRADA }}</li>
+        {% endfor %}
+    </ul>
+
+    {% if erro %}
+        <p style="color:red;">{{ erro }}</p>
+    {% endif %}
+</body>
+</html>

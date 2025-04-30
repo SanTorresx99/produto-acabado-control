@@ -1,3 +1,4 @@
+#src/logic/usuario.py
 import pandas as pd
 import os
 
@@ -11,15 +12,15 @@ def autenticar_usuario(login, senha):
         senha (str): A senha do usuário.
 
     Retorna:
-        dict: Dados do usuário (ID, login, nome, etc.) caso o login e senha estejam corretos, 
-              ou None caso contrário.
+        dict: Dados do usuário (ID, login, nome, etc.) caso o login e senha estejam corretos,
+        ou None caso contrário.
     """
     usuarios_file = os.path.join(os.path.dirname(__file__), '..', 'files', 'usuarios.csv')
 
     try:
         # Lê o arquivo CSV com o separador correto (verifique se é ponto e vírgula)
         df_usuarios = pd.read_csv(usuarios_file, sep=',')
-        
+
         # Remover espaços extras nas colunas
         df_usuarios.columns = df_usuarios.columns.str.strip()
 
@@ -33,8 +34,8 @@ def autenticar_usuario(login, senha):
 
         # Verifica se o login e a senha existem no dataframe
         usuario = df_usuarios[(df_usuarios['LOGIN'] == login.strip()) &
-                               (df_usuarios['SENHA'] == senha.strip()) &
-                               (df_usuarios['ATIVO'] == 'S')]
+                            (df_usuarios['SENHA'] == senha.strip()) &
+                            (df_usuarios['ATIVO'] == 'S')]
 
         if not usuario.empty:
             # Retorna os dados do usuário como um dicionário

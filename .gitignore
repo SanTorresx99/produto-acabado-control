@@ -20,4 +20,6 @@ Thumbs.db
 .vscode/
 
 # Ignorar arquivos de apontamento
-/data/apontamentos.csv
+/src/files/usuarios.csv
+/src/files/registros.csv
+/src/logs/logs.txt

@@ -1,6 +1,6 @@
 # src/logic/consulta_ops.py
 
-from database.conexao import conectar
+from src.database.conexao import conectar
 import pandas as pd
 
 def carregar_ops(data_inicio: str) -> pd.DataFrame:
@@ -40,7 +40,7 @@ def carregar_ops(data_inicio: str) -> pd.DataFrame:
         LEFT JOIN periodo_producao pp ON pp.id_periodo_producao = opp.id_periodo_producao
         LEFT JOIN especie e ON e.id_especie = p.id_especie
         LEFT JOIN sub_especie se ON se.id_sub_especie = p.id_sub_especie
-        WHERE CAST(opp.data_prev_inicio AS DATE) like '{data_inicio}%'
+        WHERE CAST(opp.data_prev_inicio AS DATE) = '{data_inicio}'
         ORDER BY opp.id_os_producao_linha_prod DESC
     """
 
