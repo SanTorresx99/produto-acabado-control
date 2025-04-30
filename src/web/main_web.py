@@ -7,7 +7,7 @@ import pandas as pd
 from datetime import datetime
 
 from src.logic.usuario import autenticar_usuario
-from src.logic.consulta_ops import carregar_ops, filtrar_ops_por_esp_especie
+from src.logic.consulta_ops import carregar_ops_intervalo, filtrar_ops_por_esp_especie
 from src.logic.leitor_codigo import REGISTROS_CSV_PATH
 
 app = FastAPI()
@@ -37,7 +37,11 @@ async def admin_dashboard(request: Request):
         especie_filtro = request.query_params.get("especie") or ""
         subespecie_filtro = request.query_params.get("subespecie") or ""
 
-        df_ops = carregar_ops(data_str)
+        # Ajuste para buscar no intervalo de um dia completo
+        data_inicio = f"{data_str} 00:00:00"
+        data_fim = f"{data_str} 23:59:59"
+
+        df_ops = carregar_ops_intervalo(data_inicio, data_fim)
         df_ops.columns = df_ops.columns.str.upper()
 
         if df_ops.empty:
