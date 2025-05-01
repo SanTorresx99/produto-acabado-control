@@ -9,169 +9,136 @@
   <div class="max-w-6xl mx-auto">
     <h1 class="text-3xl font-bold mb-6 text-center">Dashboard Administrativo</h1>
 
-    <form method="get" action="/admin" class="bg-white shadow-md rounded-lg p-6 mb-6 grid grid-cols-1 md:grid-cols-4 gap-4" id="form-filtro">
+    <div class="bg-white shadow-md rounded-lg p-6 mb-6 grid grid-cols-1 md:grid-cols-4 gap-4" id="form-filtro">
       <div>
         <label for="data" class="block font-semibold">Data:</label>
-        <input type="date" id="data" name="data" value="{{ data_selecionada }}" class="w-full border rounded px-3 py-2" required>
+        <input type="date" id="data" class="w-full border rounded px-3 py-2" required>
       </div>
 
       <div>
         <label for="especie" class="block font-semibold">Espécie:</label>
-        <select name="especie" id="especie" class="w-full border rounded px-3 py-2" {% if not especies %}disabled{% endif %}>
+        <select id="especie" class="w-full border rounded px-3 py-2">
           <option value="todas">-- todas --</option>
-          {% for esp in especies %}
-            <option value="{{ esp }}" {% if esp == especie_selecionada %}selected{% endif %}>{{ esp }}</option>
-          {% endfor %}
         </select>
       </div>
 
       <div>
         <label for="subespecie" class="block font-semibold">Subespécie:</label>
-        <select name="subespecie" id="subespecie" class="w-full border rounded px-3 py-2" {% if not subespecies %}disabled{% endif %}>
+        <select id="subespecie" class="w-full border rounded px-3 py-2">
           <option value="todas">-- todas --</option>
-          {% for subesp in subespecies %}
-            <option value="{{ subesp }}" {% if subesp == subespecie_selecionada %}selected{% endif %}>{{ subesp }}</option>
-          {% endfor %}
         </select>
       </div>
 
       <div class="flex items-end">
-        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded" id="buscar-btn">
+        <button id="buscar-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded">
           Buscar
         </button>
       </div>
-    </form>
-
-    {% if erro %}
-    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-      {{ erro }}
     </div>
-    {% endif %}
 
-    {% if ops_disponiveis %}
-    <div class="bg-white shadow-md rounded-lg p-6 mb-6">
-      <h2 class="text-lg font-semibold mb-4">Ordens de Produção</h2>
-      <table class="table-auto w-full text-sm">
-        <thead class="bg-gray-200">
-          <tr>
-            <th class="px-4 py-2">Código</th>
-            <th class="px-4 py-2">Produto</th>
-            <th class="px-4 py-2">Espécie</th>
-            <th class="px-4 py-2">Subespécie</th>
-            <th class="px-4 py-2">Previsto</th>
-            <th class="px-4 py-2">Ação</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for op in ops_disponiveis %}
-          <tr class="border-t">
-            <td class="px-4 py-2">{{ op.CODIGO_OP }}</td>
-            <td class="px-4 py-2">{{ op.NOME_PRODUTO }}</td>
-            <td class="px-4 py-2">{{ op.ESPECIE }}</td>
-            <td class="px-4 py-2">{{ op.SUB_ESPECIE }}</td>
-            <td class="px-4 py-2">{{ op.QTD_PREVISTA }}</td>
-            <td class="px-4 py-2">
-              <a href="/op/{{ op.CODIGO_OP }}" class="text-white bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-xs font-semibold">Selecionar</a>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% endif %}
+    <div id="resultado-op"></div>
 
     <script>
       const dataInput = document.getElementById('data');
       const especieSelect = document.getElementById('especie');
       const subespecieSelect = document.getElementById('subespecie');
       const buscarBtn = document.getElementById('buscar-btn');
-      
-      // Formatar a visualização da data para o padrão brasileiro
-      function formatarDataBR(dataISO) {
-        if (!dataISO) return '';
-        const [ano, mes, dia] = dataISO.split('-');
-        return `${dia}/${mes}/${ano}`;
+      const resultadoDiv = document.getElementById('resultado-op');
+
+      async function atualizarFiltros() {
+        const data = dataInput.value;
+        const especie = especieSelect.value;
+        const subespecie = subespecieSelect.value;
+
+        const resp = await fetch(`/api/filtros?data=${data}&especie=${encodeURIComponent(especie)}&subespecie=${encodeURIComponent(subespecie)}`);
+        const dados = await resp.json();
+
+        especieSelect.innerHTML = `<option value="todas">-- todas --</option>`;
+        dados.especies.forEach(esp => {
+          const opt = document.createElement("option");
+          opt.value = esp;
+          opt.textContent = esp;
+          especieSelect.appendChild(opt);
+        });
+
+        subespecieSelect.innerHTML = `<option value="todas">-- todas --</option>`;
+        dados.subespecies.forEach(sub => {
+          const opt = document.createElement("option");
+          opt.value = sub;
+          opt.textContent = sub;
+          subespecieSelect.appendChild(opt);
+        });
       }
-      
-      // Formatar a data para o padrão ISO ao enviar
-      function formatarDataISO(dataBR) {
-        if (!dataBR) return '';
-        const [dia, mes, ano] = dataBR.split('/');
-        return `${ano}-${mes}-${dia}`;
+
+      async function buscarOps() {
+        const data = dataInput.value;
+        const especie = especieSelect.value;
+        const subespecie = subespecieSelect.value;
+
+        const resp = await fetch(`/api/ops?data=${data}&especie=${encodeURIComponent(especie)}&subespecie=${encodeURIComponent(subespecie)}`);
+        const dados = await resp.json();
+
+        if (!dados.ops || dados.ops.length === 0) {
+          resultadoDiv.innerHTML = '<p class="text-center text-red-600">Nenhuma OP encontrada.</p>';
+          return;
+        }
+
+        let html = `
+          <div class="bg-white shadow-md rounded-lg p-6 mb-6">
+            <h2 class="text-lg font-semibold mb-4">Ordens de Produção</h2>
+            <table class="table-auto w-full text-sm">
+              <thead class="bg-gray-200">
+                <tr>
+                  <th class="px-4 py-2">Código</th>
+                  <th class="px-4 py-2">Produto</th>
+                  <th class="px-4 py-2">Espécie</th>
+                  <th class="px-4 py-2">Subespécie</th>
+                  <th class="px-4 py-2">Previsto</th>
+                  <th class="px-4 py-2">Ação</th>
+                </tr>
+              </thead>
+              <tbody>
+        `;
+
+        dados.ops.forEach(op => {
+          html += `
+            <tr class="border-t">
+              <td class="px-4 py-2">${op.CODIGO_OP}</td>
+              <td class="px-4 py-2">${op.NOME_PRODUTO}</td>
+              <td class="px-4 py-2">${op.ESPECIE}</td>
+              <td class="px-4 py-2">${op.SUB_ESPECIE}</td>
+              <td class="px-4 py-2">${op.QTD_PREVISTA}</td>
+              <td class="px-4 py-2">
+                <a href="/op/${op.CODIGO_OP}" class="text-white bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-xs font-semibold">Selecionar</a>
+              </td>
+            </tr>
+          `;
+        });
+
+        html += `</tbody></table></div>`;
+        resultadoDiv.innerHTML = html;
       }
-      
-      // Inicializar o elemento de data com valor formatado para visualização
-      const dataAtual = dataInput.value;
-      const dataFormatadaParaExibicao = dataAtual ? formatarDataBR(dataAtual) : '';
-      
-      // Função para atualizar filtros mantendo a espécie selecionada
-      async function atualizarFiltros(dataSelecionada, especieSelecionada = "") {
-        try {
-          buscarBtn.disabled = true;
-          buscarBtn.innerHTML = 'Carregando...';
-          
-          const url = `/api/filtros?data=${dataSelecionada}&especie=${encodeURIComponent(especieSelecionada)}`;
-          const resp = await fetch(url);
+
+      buscarBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        buscarOps();
+      });
+
+      dataInput.addEventListener('change', atualizarFiltros);
+      especieSelect.addEventListener('change', atualizarFiltros);
+      subespecieSelect.addEventListener('change', async () => {
+        const sub = subespecieSelect.value;
+        if (sub && sub !== "todas") {
+          const resp = await fetch(`/api/especie_por_subespecie?subespecie=${encodeURIComponent(sub)}`);
           const dados = await resp.json();
-
-          especieSelect.innerHTML = `<option value="todas">-- todas --</option>`;
-          dados.especies.forEach(esp => {
-            const opt = document.createElement("option");
-            opt.value = esp.trim();
-            opt.textContent = esp;
-            if (esp.trim() === especieSelecionada.trim()) opt.selected = true;
-            especieSelect.appendChild(opt);
-          });
-
-          subespecieSelect.innerHTML = `<option value="todas">-- todas --</option>`;
-          dados.subespecies.forEach(sub => {
-            const opt = document.createElement("option");
-            opt.value = sub.trim();
-            opt.textContent = sub;
-            subespecieSelect.appendChild(opt);
-          });
-
-          especieSelect.disabled = false;
-          subespecieSelect.disabled = false;
-          buscarBtn.disabled = false;
-          buscarBtn.innerHTML = 'Buscar';
-
-        } catch (e) {
-          console.error("Erro ao buscar filtros:", e);
-          buscarBtn.disabled = false;
-          buscarBtn.innerHTML = 'Buscar';
-        }
-      }
-
-      dataInput.addEventListener('change', () => {
-        const dataSelecionada = dataInput.value;
-        if (dataSelecionada) {
-          atualizarFiltros(dataSelecionada, especieSelect.value);
-        }
-      });
-
-      especieSelect.addEventListener('change', () => {
-        const dataSelecionada = dataInput.value;
-        const especieSelecionada = especieSelect.value;
-        if (dataSelecionada) {
-          atualizarFiltros(dataSelecionada, especieSelecionada);
-        }
-      });
-      
-      // Este trecho garante que a página carregue os filtros corretamente
-      document.addEventListener('DOMContentLoaded', () => {
-        const urlParams = new URLSearchParams(window.location.search);
-        const dataParam = urlParams.get('data');
-        const especieParam = urlParams.get('especie');
-        
-        if (dataParam) {
-          // Se houver resultados visíveis para a busca, não precisamos recarregar
-          const temResultados = document.querySelector('table tbody tr');
-          if (!temResultados && especieParam) {
-            atualizarFiltros(dataParam, especieParam);
+          if (dados.especie) {
+            especieSelect.value = dados.especie;
+            atualizarFiltros();
           }
         }
       });
+
+      document.addEventListener('DOMContentLoaded', atualizarFiltros);
     </script>
   </div>
 </body>

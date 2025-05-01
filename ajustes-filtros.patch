@@ -1,0 +1,47 @@
+diff --git a/src/web/main_web.py b/src/web/main_web.py
+index abc1234..def5678 100644
+--- a/src/web/main_web.py
++++ b/src/web/main_web.py
+@@ -205,7 +205,16 @@
+ @app.get("/api/filtros")
+-async def filtros_por_data(data: str, especie: str = ""):
++async def filtros_por_data(data: str, especie: str = "", subespecie: str = ""):
+     try:
+         data_inicio = f"{data} 00:00:00"
+         data_fim = f"{data} 23:59:59"
+         df = carregar_ops_intervalo(data_inicio, data_fim)
+         df.columns = df.columns.str.upper()
+
+         especies = sorted(df["ESPECIE"].dropna().unique().tolist())
+         subespecies = sorted(df["SUB_ESPECIE"].dropna().unique().tolist())
+
+-        if especie and especie.lower() != "todas":
+-            df_filtrado = df[df["ESPECIE"] == especie.strip()]
+-            subespecies = sorted(df_filtrado["SUB_ESPECIE"].dropna().unique().tolist())
+-        else:
+-            subespecies = sorted(df["SUB_ESPECIE"].dropna().unique().tolist())
++        if especie and especie.lower() != "todas":
++            df = df[df["ESPECIE"] == especie.strip()]
++            subespecies = sorted(df["SUB_ESPECIE"].dropna().unique().tolist())
++
++        if subespecie and subespecie.lower() != "todas":
++            df = df[df["SUB_ESPECIE"] == subespecie.strip()]
++            especies = sorted(df["ESPECIE"].dropna().unique().tolist())
+
+         return JSONResponse({"especies": especies, "subespecies": subespecies})
+
+     except Exception as e:
+         return JSONResponse({"erro": str(e), "especies": [], "subespecies": []})
+
++
++@app.get("/api/especie_por_subespecie")
++async def obter_especie_por_subespecie(subespecie: str):
++    try:
++        df = carregar_ops_intervalo(None, None)
++        df.columns = df.columns.str.upper()
++        especie = df[df["SUB_ESPECIE"] == subespecie]["ESPECIE"].dropna().unique()
++        if len(especie) > 0:
++            return JSONResponse({"especie": especie[0]})
++        return JSONResponse({"especie": ""})
++    except Exception as e:
++        return JSONResponse({"erro": str(e), "especie": ""})

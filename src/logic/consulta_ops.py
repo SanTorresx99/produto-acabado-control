@@ -1,3 +1,4 @@
+#src/logic/consulta_ops.py
 from src.database.conexao import conectar
 import pandas as pd
 
@@ -85,9 +86,15 @@ def carregar_ops_intervalo(data_inicio: str, data_fim: str) -> pd.DataFrame:
     finally:
         conn.close()
 
+# def filtrar_ops_por_esp_especie(df: pd.DataFrame, especie_escolhida: str, subesp_escolhida: str) -> pd.DataFrame:
+#     if especie_escolhida != "0" and especie_escolhida.lower() != "todas":
+#         df = df[df['ESPECIE'] == especie_escolhida]
+#     if subesp_escolhida != "0" and subesp_escolhida.lower() != "todas":
+#         df = df[df['SUB_ESPECIE'] == subesp_escolhida]
+#     return df
 def filtrar_ops_por_esp_especie(df: pd.DataFrame, especie_escolhida: str, subesp_escolhida: str) -> pd.DataFrame:
-    if especie_escolhida != "0" and especie_escolhida.lower() != "todas":
+    if especie_escolhida and especie_escolhida.lower() != "todas":
         df = df[df['ESPECIE'] == especie_escolhida]
-    if subesp_escolhida != "0" and subesp_escolhida.lower() != "todas":
+    if subesp_escolhida and subesp_escolhida.lower() != "todas":
         df = df[df['SUB_ESPECIE'] == subesp_escolhida]
     return df
