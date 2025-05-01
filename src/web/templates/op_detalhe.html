@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Detalhes da OP</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    .info-label {
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <div class="container mt-5">
+    <h2 class="text-center mb-4">Apontamento da OP: {{ op.CODIGO_OP }}</h2>
+
+    <div class="row mb-3">
+      <div class="col-md-6">
+        <p><span class="info-label">Produto:</span> {{ op.NOME_PRODUTO }}</p>
+        <p><span class="info-label">Espécie:</span> {{ op.ESPECIE }}</p>
+        <p><span class="info-label">Subespécie:</span> {{ op.SUB_ESPECIE }}</p>
+      </div>
+      <div class="col-md-6">
+        <p><span class="info-label">Quantidade Prevista:</span> {{ op.QTD_PREVISTA }}</p>
+        <p><span class="info-label">Quantidade Registrada:</span> <span id="qtd-registrada">{{ qtd_registrada }}</span></p>
+        <p><span class="info-label">Código de Barras Esperado:</span> {{ op.CODIGO_BARRAS }}</p>
+      </div>
+    </div>
+
+    <form id="form-registro" class="text-center">
+      <label class="form-label">Leitura de Código de Barras:</label>
+      <input type="text" id="codigo-input" class="form-control form-control-lg text-center" placeholder="Escaneie o código de barras..." autofocus>
+      <button type="submit" class="btn btn-success mt-3">Registrar</button>
+    </form>
+
+    <div id="msg" class="text-center mt-3"></div>
+
+    <div class="text-center mt-5">
+      <a href="/admin" class="btn btn-secondary">Voltar</a>
+    </div>
+  </div>
+
+  <script>
+    const codOp = "{{ op.CODIGO_OP }}";
+    const nomeProduto = "{{ op.NOME_PRODUTO }}";
+    const especie = "{{ op.ESPECIE }}";
+    const subespecie = "{{ op.SUB_ESPECIE }}";
+    const idProduto = "{{ op.ID_PRODUTO }}";
+    const codBarrasEsperado = "{{ op.CODIGO_BARRAS }}";
+
+    const input = document.getElementById('codigo-input');
+    const msg = document.getElementById('msg');
+    const form = document.getElementById('form-registro');
+    const spanQtd = document.getElementById('qtd-registrada');
+
+    async function registrar(codigo) {
+      const dados = {
+      cod_op: codOp,
+      codigo_barras: codigo, // <- Isso aqui estava fora da função antes!
+      nome_produto: nomeProduto,
+      especie: especie,
+      sub_especie: subespecie,
+      id_produto: idProduto
+      };
+
+      const res = await fetch('/api/registrar_leitura', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dados)
+      });
+
+      const resultado = await res.json();
+
+      if (resultado.ok) {
+        msg.innerHTML = `<span class='text-success'>Registrado com sucesso!</span>`;
+        spanQtd.textContent = parseInt(spanQtd.textContent) + 1;
+      } else {
+        msg.innerHTML = `<span class='text-danger'>${resultado.erro}</span>`;
+      }
+
+      input.value = '';
+      input.focus();
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const codigo = input.value.trim();
+      if (!codigo) return;
+      await registrar(codigo);
+    });
+
+    input.addEventListener('input', async () => {
+      const codigo = input.value.trim();
+      if (codigo.length === 13) {
+        await registrar(codigo);
+      }
+    });
+  </script>
+</body>
+</html>

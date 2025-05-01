@@ -1,145 +1,110 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-  <meta charset="UTF-8">
-  <title>Dashboard Administrativo</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <meta charset="UTF-8">
+    <title>OPS e Apontamento - User Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        tr.clickable-row:hover {
+            background-color: #f1f1f1;
+            cursor: pointer;
+        }
+    </style>
 </head>
-<body class="bg-gray-100 min-h-screen p-6 text-gray-800">
-  <div class="max-w-6xl mx-auto">
-    <h1 class="text-3xl font-bold mb-6 text-center">Dashboard Administrativo</h1>
+<body class="bg-light">
+    <div class="container mt-5">
+        <h2 class="text-center fw-bold">OPS e Apontamento - User Admin</h2>
 
-    <div class="bg-white shadow-md rounded-lg p-6 mb-6 grid grid-cols-1 md:grid-cols-4 gap-4" id="form-filtro">
-      <div>
-        <label for="data" class="block font-semibold">Data:</label>
-        <input type="date" id="data" class="w-full border rounded px-3 py-2" required>
-      </div>
+        <form class="mt-4 d-flex flex-wrap justify-content-center gap-3" id="form-filtros">
+            <div>
+                <label class="form-label">Data:</label>
+                <input type="date" class="form-control" name="data" id="data" required>
+            </div>
 
-      <div>
-        <label for="especie" class="block font-semibold">Espécie:</label>
-        <select id="especie" class="w-full border rounded px-3 py-2">
-          <option value="todas">-- todas --</option>
-        </select>
-      </div>
+            <div>
+                <label class="form-label">Subespécie:</label>
+                <select class="form-select" name="subespecie" id="subespecie">
+                    <option value="">-- todas --</option>
+                </select>
+            </div>
 
-      <div>
-        <label for="subespecie" class="block font-semibold">Subespécie:</label>
-        <select id="subespecie" class="w-full border rounded px-3 py-2">
-          <option value="todas">-- todas --</option>
-        </select>
-      </div>
+            <div class="align-self-end">
+                <button type="submit" class="btn btn-primary">Buscar</button>
+            </div>
+        </form>
 
-      <div class="flex items-end">
-        <button id="buscar-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded">
-          Buscar
-        </button>
-      </div>
+        <div class="table-responsive mt-5" id="resultado" style="display:none;">
+            <h5>Resultado:</h5>
+            <table class="table table-striped table-bordered" id="tabela-ops">
+                <thead class="table-dark">
+                    <tr id="cabecalho-tabela"></tr>
+                </thead>
+                <tbody id="corpo-tabela"></tbody>
+            </table>
+        </div>
     </div>
 
-    <div id="resultado-op"></div>
-
     <script>
-      const dataInput = document.getElementById('data');
-      const especieSelect = document.getElementById('especie');
-      const subespecieSelect = document.getElementById('subespecie');
-      const buscarBtn = document.getElementById('buscar-btn');
-      const resultadoDiv = document.getElementById('resultado-op');
+        const form = document.getElementById('form-filtros');
+        const subespecieSelect = document.getElementById('subespecie');
+        const dataInput = document.getElementById('data');
+        const divResultado = document.getElementById('resultado');
+        const tabelaCabecalho = document.getElementById('cabecalho-tabela');
+        const tabelaCorpo = document.getElementById('corpo-tabela');
 
-      async function atualizarFiltros() {
-        const data = dataInput.value;
-        const especie = especieSelect.value;
-        const subespecie = subespecieSelect.value;
+        dataInput.valueAsDate = new Date();
 
-        const resp = await fetch(`/api/filtros?data=${data}&especie=${encodeURIComponent(especie)}&subespecie=${encodeURIComponent(subespecie)}`);
-        const dados = await resp.json();
+        async function carregarSubespecies() {
+            const data = dataInput.value;
+            const url = `/api/filtros?data=${data}`;
+            const res = await fetch(url);
+            const dados = await res.json();
 
-        especieSelect.innerHTML = `<option value="todas">-- todas --</option>`;
-        dados.especies.forEach(esp => {
-          const opt = document.createElement("option");
-          opt.value = esp;
-          opt.textContent = esp;
-          especieSelect.appendChild(opt);
-        });
-
-        subespecieSelect.innerHTML = `<option value="todas">-- todas --</option>`;
-        dados.subespecies.forEach(sub => {
-          const opt = document.createElement("option");
-          opt.value = sub;
-          opt.textContent = sub;
-          subespecieSelect.appendChild(opt);
-        });
-      }
-
-      async function buscarOps() {
-        const data = dataInput.value;
-        const especie = especieSelect.value;
-        const subespecie = subespecieSelect.value;
-
-        const resp = await fetch(`/api/ops?data=${data}&especie=${encodeURIComponent(especie)}&subespecie=${encodeURIComponent(subespecie)}`);
-        const dados = await resp.json();
-
-        if (!dados.ops || dados.ops.length === 0) {
-          resultadoDiv.innerHTML = '<p class="text-center text-red-600">Nenhuma OP encontrada.</p>';
-          return;
+            const subespecieAtual = subespecieSelect.value;
+            subespecieSelect.innerHTML = '<option value="">-- todas --</option>';
+            dados.subespecies.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s;
+                opt.textContent = s;
+                if (s === subespecieAtual) opt.selected = true;
+                subespecieSelect.appendChild(opt);
+            });
         }
 
-        let html = `
-          <div class="bg-white shadow-md rounded-lg p-6 mb-6">
-            <h2 class="text-lg font-semibold mb-4">Ordens de Produção</h2>
-            <table class="table-auto w-full text-sm">
-              <thead class="bg-gray-200">
-                <tr>
-                  <th class="px-4 py-2">Código</th>
-                  <th class="px-4 py-2">Produto</th>
-                  <th class="px-4 py-2">Espécie</th>
-                  <th class="px-4 py-2">Subespécie</th>
-                  <th class="px-4 py-2">Previsto</th>
-                  <th class="px-4 py-2">Ação</th>
-                </tr>
-              </thead>
-              <tbody>
-        `;
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = dataInput.value;
+            const subespecie = subespecieSelect.value;
 
-        dados.ops.forEach(op => {
-          html += `
-            <tr class="border-t">
-              <td class="px-4 py-2">${op.CODIGO_OP}</td>
-              <td class="px-4 py-2">${op.NOME_PRODUTO}</td>
-              <td class="px-4 py-2">${op.ESPECIE}</td>
-              <td class="px-4 py-2">${op.SUB_ESPECIE}</td>
-              <td class="px-4 py-2">${op.QTD_PREVISTA}</td>
-              <td class="px-4 py-2">
-                <a href="/op/${op.CODIGO_OP}" class="text-white bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-xs font-semibold">Selecionar</a>
-              </td>
-            </tr>
-          `;
+            const res = await fetch(`/api/ops?data=${data}&subespecie=${encodeURIComponent(subespecie)}`);
+            const dados = await res.json();
+
+            const registros = dados.ops || [];
+            divResultado.style.display = registros.length > 0 ? 'block' : 'none';
+
+            if (registros.length === 0) {
+                tabelaCabecalho.innerHTML = '';
+                tabelaCorpo.innerHTML = '<tr><td colspan="99" class="text-center">Nenhum registro encontrado.</td></tr>';
+                return;
+            }
+
+            const colunas = Object.keys(registros[0]);
+            tabelaCabecalho.innerHTML = colunas.map(col => {
+                if (col === "QTD_REGISTRADA") return '<th class="text-center">Qtd. Registrada</th>';
+                return `<th>${col.replace(/_/g, ' ')}</th>`;
+            }).join('');
+
+            tabelaCorpo.innerHTML = registros.map(row => {
+                const codigoOP = row["CODIGO_OP"];
+                const linha = colunas.map(col => {
+                    return `<td class="text-center">${row[col]}</td>`;
+                }).join('');
+                return `<tr class="clickable-row" onclick="window.location='/op/${codigoOP}'">${linha}</tr>`;
+            }).join('');
         });
 
-        html += `</tbody></table></div>`;
-        resultadoDiv.innerHTML = html;
-      }
-
-      buscarBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        buscarOps();
-      });
-
-      dataInput.addEventListener('change', atualizarFiltros);
-      especieSelect.addEventListener('change', atualizarFiltros);
-      subespecieSelect.addEventListener('change', async () => {
-        const sub = subespecieSelect.value;
-        if (sub && sub !== "todas") {
-          const resp = await fetch(`/api/especie_por_subespecie?subespecie=${encodeURIComponent(sub)}`);
-          const dados = await resp.json();
-          if (dados.especie) {
-            especieSelect.value = dados.especie;
-            atualizarFiltros();
-          }
-        }
-      });
-
-      document.addEventListener('DOMContentLoaded', atualizarFiltros);
+        dataInput.addEventListener('change', carregarSubespecies);
+        carregarSubespecies();
     </script>
-  </div>
 </body>
 </html>
