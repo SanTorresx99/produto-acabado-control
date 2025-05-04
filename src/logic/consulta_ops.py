@@ -1,6 +1,9 @@
 #src/logic/consulta_ops.py
+from dotenv import load_dotenv
+load_dotenv()
 from src.database.conexao import conectar
 import pandas as pd
+
 
 def carregar_ops(data_inicio: str) -> pd.DataFrame:
     conn = conectar()

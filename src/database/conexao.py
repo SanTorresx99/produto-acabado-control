@@ -1,9 +1,14 @@
 #src/database/conexao.py
+from dotenv import load_dotenv
 import os
 from firebird.driver import connect
-from dotenv import load_dotenv
 
-load_dotenv()
+# Força o carregamento do .env correto a partir da raiz do projeto
+dotenv_path = os.path.join(os.path.dirname(__file__), '.', '.', '.env')
+load_dotenv(dotenv_path)
+
+print("[DEBUG] DSN carregado do .env:", os.getenv("FIREBIRD_DSN"))
+
 
 def conectar():
     try:
@@ -12,6 +17,7 @@ def conectar():
             user=os.getenv("FIREBIRD_USER"),
             password=os.getenv("FIREBIRD_PASSWORD"),
         )
+        print("[DEBUG] Conectando ao banco:", os.getenv("FIREBIRD_DSN"))
         print("[OK] Conectado ao banco Firebird com sucesso.")
         return con
     except Exception as e:
