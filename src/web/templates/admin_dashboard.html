@@ -3,159 +3,117 @@
 <head>
     <meta charset="UTF-8">
     <title>OPS e Apontamento - User Admin</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
+            background-color: #f8f9fa;
             font-family: 'Inter', sans-serif;
-            background-color: #f9fafb;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 20px;
         }
-        h1 {
-            color: #111827;
-            font-size: 24px;
-            font-weight: 700;
-            margin-bottom: 20px;
+        .status-ok {
+            color: green;
+            font-weight: bold;
         }
-        form {
-            background: white;
-            padding: 16px;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-            margin-bottom: 20px;
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-        label {
-            font-weight: 600;
-            font-size: 14px;
-            color: #374151;
-        }
-        select, input[type="date"] {
-            padding: 6px 10px;
-            font-size: 14px;
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
-        }
-        button {
-            background-color: #2563eb;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            font-weight: 600;
-            border-radius: 6px;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #1d4ed8;
-        }
-        table {
-            width: 100%;
-            max-width: 1200px;
-            border-collapse: collapse;
-            background-color: white;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
-        }
-        th, td {
-            padding: 12px 16px;
-            text-align: left;
-            font-size: 14px;
-        }
-        th {
-            background-color: #1f2937;
-            color: white;
-        }
-        tr:nth-child(even) {
-            background-color: #f3f4f6;
-        }
-        tr:hover {
-            background-color: #e5e7eb;
-            cursor: pointer;
+        footer {
+            position: fixed;
+            bottom: 5px;
+            right: 10px;
+            font-size: 12px;
+            color: #9ca3af;
         }
     </style>
 </head>
 <body>
-    <h1>OPS e Apontamento - User Admin</h1>
+<div class="container mt-5">
+    <h2 class="text-center mb-4">OPS e Apontamento - User Admin</h2>
 
-    <form method="get" onsubmit="filtrarOps(); return false;">
-        <label for="data">Data:</label>
-        <input type="date" id="data" name="data">
+    <div class="row mb-3">
+        <div class="col-md-3">
+            <label class="form-label">Data:</label>
+            <input type="date" class="form-control" id="filtro-data" value="{{ hoje }}">
+        </div>
+        <div class="col-md-5">
+            <label class="form-label">Subespécie:</label>
+            <select id="filtro-subespecie" class="form-select">
+                <option>Todas</option>
+            </select>
+        </div>
+        <div class="col-md-4 d-flex align-items-end justify-content-end">
+            <button class="btn btn-primary me-2" onclick="carregarOPS()">Atualizar</button>
+            <button class="btn btn-secondary" onclick="history.back()">Voltar</button>
+        </div>
+    </div>
 
-        <label for="subespecie">Subespécie:</label>
-        <select id="subespecie" name="subespecie">
-            <option value="">Todas</option>
-        </select>
+    <div id="resumo" class="mb-3"></div>
 
-        <button type="submit">Buscar</button>
-    </form>
-
-    <table id="tabela-ops">
-        <thead>
-            <tr>
-                <th>Código OP</th>
-                <th>Produto</th>
-                <th>Subespécie</th>
-                <th>Quantidade Prevista</th>
-                <th>Quantidade Registrada</th>
-            </tr>
+    <table class="table table-bordered">
+        <thead class="table-dark">
+        <tr>
+            <th>Código OP</th>
+            <th>Produto</th>
+            <th>Subespécie</th>
+            <th>Quantidade Prevista</th>
+            <th>Quantidade Registrada</th>
+            <th>Status</th>
+        </tr>
         </thead>
-        <tbody>
-            <!-- Linhas serão inseridas via JS -->
-        </tbody>
+        <tbody id="tabela-ops"></tbody>
     </table>
+</div>
 
-    <script>
-        async function carregarSubespecies(data) {
-            const resp = await fetch(`/api/filtros?data=${data}`);
-            const dados = await resp.json();
-            const select = document.getElementById('subespecie');
-            select.innerHTML = '<option value="">Todas</option>';
-            dados.subespecies.forEach(sub => {
-                const option = document.createElement('option');
-                option.value = sub;
-                option.textContent = sub;
-                select.appendChild(option);
-            });
-        }
+<footer>-- Programa criado em 05/2025 by Sandro Torres — Autorizado uso e acesso por Marjom</footer>
 
-        async function filtrarOps() {
-            const data = document.getElementById('data').value;
-            const subesp = document.getElementById('subespecie').value;
-            const resp = await fetch(`/api/ops?data=${data}&subespecie=${subesp}`);
-            const dados = await resp.json();
+<script>
+    const dataInput = document.getElementById("filtro-data");
+    const subespecieSelect = document.getElementById("filtro-subespecie");
+    const tabelaOps = document.getElementById("tabela-ops");
+    const resumoDiv = document.getElementById("resumo");
 
-            const tbody = document.getElementById('tabela-ops').querySelector('tbody');
-            tbody.innerHTML = '';
-
-            dados.ops.forEach(op => {
-                const tr = document.createElement('tr');
-                tr.onclick = () => window.location.href = `/op/${op.CODIGO_OP}`;
-                tr.innerHTML = `
-                    <td>${op.CODIGO_OP}</td>
-                    <td>${op.NOME_PRODUTO}</td>
-                    <td>${op.SUB_ESPECIE}</td>
-                    <td>${op.QTD_PREVISTA}</td>
-                    <td>${op.QTD_REGISTRADA}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        document.getElementById('data').addEventListener('change', e => {
-            carregarSubespecies(e.target.value);
+    async function carregarFiltros() {
+        const data = dataInput.value;
+        const resp = await fetch(`/api/filtros?data=${data}`);
+        const dados = await resp.json();
+        subespecieSelect.innerHTML = '<option>Todas</option>';
+        dados.subespecies.forEach(sub => {
+            const opt = document.createElement("option");
+            opt.textContent = sub;
+            subespecieSelect.appendChild(opt);
         });
+    }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            const hoje = new Date().toISOString().split('T')[0];
-            document.getElementById('data').value = hoje;
-            carregarSubespecies(hoje).then(() => filtrarOps());
+    async function carregarOPS() {
+        const data = dataInput.value;
+        const subesp = subespecieSelect.value;
+        const resp = await fetch(`/api/ops?data=${data}&subespecie=${subesp}`);
+        const dados = await resp.json();
+        const ops = dados.ops;
+
+        let totalPrev = 0, totalReg = 0;
+        tabelaOps.innerHTML = "";
+        ops.forEach(op => {
+            const tr = document.createElement("tr");
+            tr.onclick = () => location.href = `/op/${op.CODIGO_OP}`;
+            tr.innerHTML = `
+                <td>${op.CODIGO_OP}</td>
+                <td>${op.NOME_PRODUTO}</td>
+                <td>${op.SUB_ESPECIE}</td>
+                <td>${op.QTD_PREVISTA}</td>
+                <td>${op.QTD_REGISTRADA}</td>
+                <td>${op.STATUS || ""}</td>
+            `;
+            tabelaOps.appendChild(tr);
+            totalPrev += parseInt(op.QTD_PREVISTA || 0);
+            totalReg += parseInt(op.QTD_REGISTRADA || 0);
         });
-    </script>
+        resumoDiv.innerHTML = `<strong>Total Previsto:</strong> ${totalPrev} | <strong>Total Registrado:</strong> ${totalReg}`;
+    }
+
+    document.addEventListener("DOMContentLoaded", async () => {
+        const hoje = new Date().toISOString().split("T")[0];
+        dataInput.value = hoje;
+        await carregarFiltros();
+        await carregarOPS();
+    });
+</script>
 </body>
 </html>

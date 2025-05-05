@@ -23,15 +23,12 @@ if os.path.exists(static_path):
 
 @app.get("/", response_class=HTMLResponse)
 async def tela_login(request: Request):
-    print("[DEBUG] Acessando tela de login")
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.post("/login", response_class=HTMLResponse)
 async def processa_login(request: Request, login: str = Form(...), senha: str = Form(...)):
-    print(f"[DEBUG] Tentativa de login: {login}")
     usuario = autenticar_usuario(login, senha)
     if usuario:
-        print(f"[OK] Usuário autenticado: {usuario['NOME']}")
         if usuario["NIVEL_ACESSO"] == "admin":
             return RedirectResponse(url="/admin", status_code=302)
         return templates.TemplateResponse("dashboard.html", {"request": request, "usuario": usuario})
@@ -39,13 +36,11 @@ async def processa_login(request: Request, login: str = Form(...), senha: str = 
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_page(request: Request):
-    print("[DEBUG] Acessando página de administração")
     return templates.TemplateResponse("admin_dashboard.html", {"request": request})
 
 @app.get("/api/filtros")
 async def filtros_por_data(data: str):
     try:
-        print(f"[DEBUG] Carregando filtros para a data: {data}")
         data_inicio = f"{data} 00:00:00"
         data_fim = f"{data} 23:59:59"
         df = carregar_ops_intervalo(data_inicio, data_fim)
@@ -53,18 +48,15 @@ async def filtros_por_data(data: str):
         subespecies = sorted(df["SUB_ESPECIE"].dropna().astype(str).unique().tolist())
         return JSONResponse({"subespecies": subespecies})
     except Exception as e:
-        print(f"[ERRO] Filtro por data falhou: {e}")
         return JSONResponse({"erro": str(e), "subespecies": []})
 
 @app.get("/api/ops")
 async def listar_ops(data: str, subespecie: str = ""):
     try:
-        print(f"[DEBUG] Listando OPs para data={data} | subespecie={subespecie}")
         data_inicio = f"{data} 00:00:00"
         data_fim = f"{data} 23:59:59"
         df_ops = carregar_ops_intervalo(data_inicio, data_fim)
         df_ops.columns = df_ops.columns.str.upper()
-
         df_ops["SUB_ESPECIE"] = df_ops["SUB_ESPECIE"].astype(str)
         df_ops["CODIGO_OP"] = df_ops["CODIGO_OP"].astype(str)
 
@@ -81,23 +73,23 @@ async def listar_ops(data: str, subespecie: str = ""):
             qtd_por_op = {}
 
         df_ops["QTD_REGISTRADA"] = df_ops["CODIGO_OP"].map(qtd_por_op).fillna(0).astype(int)
+        df_ops["STATUS"] = df_ops.apply(lambda x: "✅" if x["QTD_REGISTRADA"] == x["QTD_PREVISTA"] else "", axis=1)
+
+        df_ops = df_ops.sort_values(by=["STATUS", "QTD_REGISTRADA", "QTD_PREVISTA", "CODIGO_OP"], ascending=[False, False, False, False])
 
         for col in df_ops.select_dtypes(include=["datetime64[ns]", "datetime64[ns, UTC]"]):
             df_ops[col] = df_ops[col].astype(str)
 
         return JSONResponse({"ops": df_ops.to_dict(orient="records")})
     except Exception as e:
-        print(f"[ERRO] Falha na listagem de OPs: {e}")
         return JSONResponse({"erro": str(e), "ops": []})
 
 @app.get("/op/{cod_op}", response_class=HTMLResponse)
 async def tela_apontamento_op(request: Request, cod_op: str):
     try:
-        print(f"[DEBUG] Acessando tela de apontamento da OP {cod_op}")
         df = carregar_ops_intervalo("2025-01-01 00:00:00", "2999-12-31 23:59:59")
         df.columns = df.columns.map(str.upper)
         df["CODIGO_OP"] = df["CODIGO_OP"].astype(str)
-
         dados_op = df[df["CODIGO_OP"] == cod_op].to_dict(orient="records")
         if not dados_op:
             return HTMLResponse(content="<h3>OP não encontrada.</h3>", status_code=404)
@@ -112,14 +104,11 @@ async def tela_apontamento_op(request: Request, cod_op: str):
         else:
             qtd_registrada = 0
 
-        print(f"[DEBUG] QTD registrada para OP {cod_op}: {qtd_registrada}")
-
         return templates.TemplateResponse("op_detalhe.html", {
             "request": request,
             "op": dados_op,
             "qtd_registrada": qtd_registrada
         })
-
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -128,17 +117,13 @@ async def tela_apontamento_op(request: Request, cod_op: str):
 @app.post("/api/registrar_leitura")
 async def api_registrar_leitura(dados: dict = Body(...)):
     try:
-        print(f"[DEBUG] Dados recebidos para registro: {dados}")
         cod_op = str(dados.get("cod_op")).strip()
-
-        # Buscar código de barras verdadeiro da OP
         df = carregar_ops_intervalo("2025-01-01 00:00:00", "2999-12-31 23:59:59")
         df.columns = df.columns.str.upper()
         df["CODIGO_OP"] = df["CODIGO_OP"].astype(str)
         linha_op = df[df["CODIGO_OP"] == cod_op]
 
         if linha_op.empty:
-            print("[ERRO] OP não encontrada para validação do código de barras")
             return {"ok": False, "erro": "OP não encontrada."}
 
         dados_op = {
@@ -156,11 +141,9 @@ async def api_registrar_leitura(dados: dict = Body(...)):
         )
 
         if sucesso:
-            print("[OK] Leitura registrada com sucesso")
             return {"ok": True}
         else:
             return {"ok": False, "erro": "Código inválido para esta OP."}
 
     except Exception as e:
-        print(f"[ERRO] Erro inesperado ao registrar leitura: {e}")
         return {"ok": False, "erro": str(e)}

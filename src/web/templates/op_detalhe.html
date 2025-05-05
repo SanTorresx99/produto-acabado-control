@@ -11,7 +11,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start;
             min-height: 100vh;
             padding: 20px;
         }
@@ -83,6 +83,13 @@
             font-weight: 600;
             text-align: center;
         }
+        footer {
+            position: fixed;
+            bottom: 10px;
+            right: 20px;
+            font-size: 12px;
+            color: #9ca3af;
+        }
     </style>
 </head>
 <body>
@@ -93,8 +100,7 @@
             <p><strong>Espécie:</strong> {{ op.ESPECIE }}</p>
             <p><strong>Subespécie:</strong> {{ op.SUB_ESPECIE }}</p>
             <p><strong>Quantidade Prevista:</strong> {{ op.QTD_PREVISTA }}</p>
-            <p><strong>Quantidade Registrada:</strong> {{ qtd_registrada }}</p>
-            <p><strong>Código de Barras Esperado:</strong> {{ op.CODIGO_BARRAS }}</p>
+            <p><strong>Quantidade Registrada:</strong> <span id="qtd-registrada">{{ qtd_registrada }}</span></p>
         </div>
 
         <form class="actions" id="form-registro">
@@ -106,10 +112,32 @@
         </form>
     </div>
 
+    <footer>
+        Programa criado em 05/2025 by Sandro Torres — Autorizado uso e acesso por Marjom
+    </footer>
+
     <script>
-        document.getElementById("form-registro").addEventListener("submit", async function(event) {
-            event.preventDefault();
-            const codigo = document.getElementById("codigo").value;
+        const input = document.getElementById("codigo");
+        const form = document.getElementById("form-registro");
+        const msg = document.getElementById("mensagem");
+        const qtdSpan = document.getElementById("qtd-registrada");
+        const codigoEsperado = "{{ op.CODIGO_BARRAS }}".trim();
+        let timeoutAutoRegistro;
+
+        input.focus();
+
+        async function registrarLeitura(codigo) {
+            if (!codigo || codigo.length !== 13) return;
+
+            if (codigo.trim() !== codigoEsperado) {
+                msg.innerText = "⚠️ Código inválido para esta OP.";
+                msg.style.color = "#dc2626";
+                input.value = "";
+                input.focus();
+                return;
+            }
+
+            const t0 = performance.now();
             const resposta = await fetch("/api/registrar_leitura", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -122,11 +150,40 @@
                     id_produto: "{{ op.ID_PRODUTO }}"
                 })
             });
+            const t1 = performance.now();
+            console.log("⏱ tempoRegistro:", (t1 - t0).toFixed(2), "ms");
+
             const result = await resposta.json();
-            const msg = document.getElementById("mensagem");
-            msg.innerText = result.ok ? "Registrado com sucesso!" : (result.erro || "Falha no registro");
+            msg.innerText = result.ok ? "✅ Registrado com sucesso!" : (result.erro || "❌ Falha no registro");
             msg.style.color = result.ok ? "#059669" : "#dc2626";
-            document.getElementById("codigo").value = "";
+            input.value = "";
+            input.focus();
+
+            if (result.ok) {
+                qtdSpan.textContent = parseInt(qtdSpan.textContent) + 1;
+            }
+        }
+
+        input.addEventListener("input", () => {
+            clearTimeout(timeoutAutoRegistro);
+            const valor = input.value.trim();
+            if (valor.length === 13 && valor === codigoEsperado) {
+                timeoutAutoRegistro = setTimeout(() => registrarLeitura(valor), 1500);
+            }
+        });
+
+        input.addEventListener("keypress", function (e) {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                clearTimeout(timeoutAutoRegistro);
+                registrarLeitura(input.value.trim());
+            }
+        });
+
+        form.addEventListener("submit", function (event) {
+            event.preventDefault();
+            clearTimeout(timeoutAutoRegistro);
+            registrarLeitura(input.value.trim());
         });
     </script>
 </body>
