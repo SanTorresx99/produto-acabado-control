@@ -1,9 +1,7 @@
-#src/logic/consulta_ops.py
 from dotenv import load_dotenv
 load_dotenv()
 from src.database.conexao import conectar
 import pandas as pd
-
 
 def carregar_ops(data_inicio: str) -> pd.DataFrame:
     conn = conectar()
@@ -32,7 +30,7 @@ def carregar_ops(data_inicio: str) -> pd.DataFrame:
         LEFT JOIN periodo_producao pp ON pp.id_periodo_producao = opp.id_periodo_producao
         LEFT JOIN especie e ON e.id_especie = p.id_especie
         LEFT JOIN sub_especie se ON se.id_sub_especie = p.id_sub_especie
-        WHERE CAST(opp.data_prev_inicio AS DATE) = '{data_inicio}'
+        WHERE CAST(opp.data_prev_inicio AS DATE) >= '{data_inicio}'
         ORDER BY opp.id_os_producao_linha_prod DESC
     """
 
@@ -47,10 +45,15 @@ def carregar_ops(data_inicio: str) -> pd.DataFrame:
     finally:
         conn.close()
 
-def carregar_ops_intervalo(data_inicio: str, data_fim: str) -> pd.DataFrame:
+def carregar_ops_intervalo(data_inicio: str, data_fim: str, codigos_op: list[str] = None) -> pd.DataFrame:
     conn = conectar()
     if not conn:
         return pd.DataFrame()
+
+    filtro_op = ""
+    if codigos_op:
+        lista_codigos = ",".join(f"'{cod.strip()}'" for cod in codigos_op if cod.strip())
+        filtro_op = f"AND opp.codigo IN ({lista_codigos})"
 
     sql = f"""
         SELECT
@@ -74,7 +77,8 @@ def carregar_ops_intervalo(data_inicio: str, data_fim: str) -> pd.DataFrame:
         LEFT JOIN periodo_producao pp ON pp.id_periodo_producao = opp.id_periodo_producao
         LEFT JOIN especie e ON e.id_especie = p.id_especie
         LEFT JOIN sub_especie se ON se.id_sub_especie = p.id_sub_especie
-        WHERE opp.data_prev_inicio BETWEEN '{data_inicio}' AND '{data_fim}'
+        WHERE CAST(opp.data_prev_inicio AS DATE) BETWEEN '{data_inicio}' AND '{data_fim}'
+        {filtro_op}
         ORDER BY opp.id_os_producao_linha_prod DESC
     """
 
@@ -89,12 +93,6 @@ def carregar_ops_intervalo(data_inicio: str, data_fim: str) -> pd.DataFrame:
     finally:
         conn.close()
 
-# def filtrar_ops_por_esp_especie(df: pd.DataFrame, especie_escolhida: str, subesp_escolhida: str) -> pd.DataFrame:
-#     if especie_escolhida != "0" and especie_escolhida.lower() != "todas":
-#         df = df[df['ESPECIE'] == especie_escolhida]
-#     if subesp_escolhida != "0" and subesp_escolhida.lower() != "todas":
-#         df = df[df['SUB_ESPECIE'] == subesp_escolhida]
-#     return df
 def filtrar_ops_por_esp_especie(df: pd.DataFrame, especie_escolhida: str, subesp_escolhida: str) -> pd.DataFrame:
     if especie_escolhida and especie_escolhida.lower() != "todas":
         df = df[df['ESPECIE'] == especie_escolhida]

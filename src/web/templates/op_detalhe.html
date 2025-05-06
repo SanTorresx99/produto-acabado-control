@@ -99,6 +99,7 @@
             <p><strong>Produto:</strong> {{ op.NOME_PRODUTO }}</p>
             <p><strong>Espécie:</strong> {{ op.ESPECIE }}</p>
             <p><strong>Subespécie:</strong> {{ op.SUB_ESPECIE }}</p>
+            <p><strong>ID Produto:</strong> {{ op.ID_PRODUTO }}</p>
             <p><strong>Quantidade Prevista:</strong> {{ op.QTD_PREVISTA }}</p>
             <p><strong>Quantidade Registrada:</strong> <span id="qtd-registrada">{{ qtd_registrada }}</span></p>
         </div>
@@ -168,7 +169,7 @@
             clearTimeout(timeoutAutoRegistro);
             const valor = input.value.trim();
             if (valor.length === 13 && valor === codigoEsperado) {
-                timeoutAutoRegistro = setTimeout(() => registrarLeitura(valor), 1500);
+                timeoutAutoRegistro = setTimeout(() => registrarLeitura(valor), 500);
             }
         });
 

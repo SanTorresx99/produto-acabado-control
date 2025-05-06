@@ -17,7 +17,8 @@ app = FastAPI()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
-static_path = os.path.join(BASE_DIR, "static")
+# Garante que a pasta static seja servida corretamente
+static_path = os.path.join(os.path.dirname(BASE_DIR), "static")
 if os.path.exists(static_path):
     app.mount("/static", StaticFiles(directory=static_path), name="static")
 
@@ -39,10 +40,8 @@ async def admin_page(request: Request):
     return templates.TemplateResponse("admin_dashboard.html", {"request": request})
 
 @app.get("/api/filtros")
-async def filtros_por_data(data: str):
+async def filtros_por_data(data_inicio: str, data_fim: str):
     try:
-        data_inicio = f"{data} 00:00:00"
-        data_fim = f"{data} 23:59:59"
         df = carregar_ops_intervalo(data_inicio, data_fim)
         df.columns = df.columns.str.upper()
         subespecies = sorted(df["SUB_ESPECIE"].dropna().astype(str).unique().tolist())
@@ -51,10 +50,8 @@ async def filtros_por_data(data: str):
         return JSONResponse({"erro": str(e), "subespecies": []})
 
 @app.get("/api/ops")
-async def listar_ops(data: str, subespecie: str = ""):
+async def listar_ops(data_inicio: str, data_fim: str, subespecie: str = "", id_produto: str = "", cod_op: str = ""):
     try:
-        data_inicio = f"{data} 00:00:00"
-        data_fim = f"{data} 23:59:59"
         df_ops = carregar_ops_intervalo(data_inicio, data_fim)
         df_ops.columns = df_ops.columns.str.upper()
         df_ops["SUB_ESPECIE"] = df_ops["SUB_ESPECIE"].astype(str)
@@ -62,6 +59,13 @@ async def listar_ops(data: str, subespecie: str = ""):
 
         if subespecie and subespecie.lower() != "todas":
             df_ops = df_ops[df_ops["SUB_ESPECIE"] == subespecie]
+
+        if id_produto:
+            df_ops = df_ops[df_ops["ID_PRODUTO"].astype(str).str.contains(id_produto.strip(), na=False)]
+
+        if cod_op:
+            codigos = [c.strip() for c in cod_op.replace(";", ",").split(",") if c.strip()]
+            df_ops = df_ops[df_ops["CODIGO_OP"].isin(codigos)]
 
         if os.path.exists(REGISTROS_CSV_PATH):
             df_reg = pd.read_csv(REGISTROS_CSV_PATH, encoding="utf-8")
@@ -73,9 +77,9 @@ async def listar_ops(data: str, subespecie: str = ""):
             qtd_por_op = {}
 
         df_ops["QTD_REGISTRADA"] = df_ops["CODIGO_OP"].map(qtd_por_op).fillna(0).astype(int)
-        df_ops["STATUS"] = df_ops.apply(lambda x: "✅" if x["QTD_REGISTRADA"] == x["QTD_PREVISTA"] else "", axis=1)
+        df_ops["STATUS"] = df_ops.apply(lambda x: "⚠️" if x["QTD_REGISTRADA"] > x["QTD_PREVISTA"] else ("✅" if x["QTD_REGISTRADA"] == x["QTD_PREVISTA"] else ""), axis=1)
 
-        df_ops = df_ops.sort_values(by=["STATUS", "QTD_REGISTRADA", "QTD_PREVISTA", "CODIGO_OP"], ascending=[False, False, False, False])
+        df_ops = df_ops.sort_values(by=["STATUS", "SUB_ESPECIE", "ID_PRODUTO", "CODIGO_OP"], ascending=[False, True, True, False])
 
         for col in df_ops.select_dtypes(include=["datetime64[ns]", "datetime64[ns, UTC]"]):
             df_ops[col] = df_ops[col].astype(str)
@@ -87,28 +91,36 @@ async def listar_ops(data: str, subespecie: str = ""):
 @app.get("/op/{cod_op}", response_class=HTMLResponse)
 async def tela_apontamento_op(request: Request, cod_op: str):
     try:
-        df = carregar_ops_intervalo("2025-01-01 00:00:00", "2999-12-31 23:59:59")
-        df.columns = df.columns.map(str.upper)
+        # Corrigido: sem horas nas datas
+        df = carregar_ops_intervalo("2025-01-01", "2999-12-31")
+        if df.empty:
+            return HTMLResponse(content="<h3>Nenhuma OP encontrada no período.</h3>", status_code=404)
+
+        df.columns = df.columns.str.upper()
+        if "CODIGO_OP" not in df.columns:
+            return HTMLResponse(content="<h3>Coluna 'CODIGO_OP' não encontrada.</h3>", status_code=500)
+
         df["CODIGO_OP"] = df["CODIGO_OP"].astype(str)
         dados_op = df[df["CODIGO_OP"] == cod_op].to_dict(orient="records")
+
         if not dados_op:
-            return HTMLResponse(content="<h3>OP não encontrada.</h3>", status_code=404)
+            return HTMLResponse(content=f"<h3>OP {cod_op} não encontrada no resultado da consulta.</h3>", status_code=404)
 
         dados_op = dados_op[0]
 
+        qtd_registrada = 0
         if os.path.exists(REGISTROS_CSV_PATH):
             df_reg = pd.read_csv(REGISTROS_CSV_PATH, encoding="utf-8")
             df_reg.columns = df_reg.columns.str.upper()
             df_reg["COD_OP"] = df_reg["COD_OP"].astype(str)
             qtd_registrada = df_reg[df_reg["COD_OP"] == cod_op].shape[0]
-        else:
-            qtd_registrada = 0
 
         return templates.TemplateResponse("op_detalhe.html", {
             "request": request,
             "op": dados_op,
             "qtd_registrada": qtd_registrada
         })
+
     except Exception as e:
         import traceback
         traceback.print_exc()
