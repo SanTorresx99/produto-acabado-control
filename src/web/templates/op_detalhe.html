@@ -2,190 +2,113 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Detalhes da OP</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <title>Conferência de Produção - Leitura</title>
+    <link rel="stylesheet" href="/static/css/style.css">
     <style>
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f9fafb;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
-            min-height: 100vh;
-            padding: 20px;
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #f6f6f6;
+            padding: 40px;
         }
         .container {
-            background-color: white;
-            padding: 24px;
-            border-radius: 16px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            max-width: 700px;
-            width: 100%;
+            max-width: 800px;
+            margin: auto;
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0px 2px 8px rgba(0,0,0,0.1);
         }
-        h1 {
-            color: #111827;
-            font-size: 24px;
-            font-weight: 700;
-            margin-bottom: 24px;
+        h2 {
             text-align: center;
+            margin-bottom: 30px;
+            color: #1a1a1a;
+        }
+        .produto {
+            font-size: 20px;
+            font-weight: bold;
+            color: #123b72;
+            text-align: center;
+            margin-bottom: 30px;
         }
         .info {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            margin-bottom: 24px;
-        }
-        .info p {
-            font-size: 16px;
-            color: #374151;
-        }
-        .info strong {
+            font-size: 17px;
             font-weight: 600;
-            color: #111827;
+            color: #2c2c2c;
+            margin-bottom: 12px;
+        }
+        form {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
         }
         input[type="text"] {
+            padding: 10px;
             width: 100%;
-            padding: 12px;
             font-size: 16px;
-            border: 1px solid #d1d5db;
-            border-radius: 8px;
-            margin-bottom: 16px;
-        }
-        .actions {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 16px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
         }
         button {
-            background-color: #059669;
-            color: white;
+            padding: 10px 18px;
             font-size: 16px;
-            font-weight: 600;
             border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
+            border-radius: 6px;
             cursor: pointer;
         }
-        button:hover {
-            background-color: #047857;
+        .btn-registrar {
+            background-color: #28a745;
+            color: white;
         }
-        .back-btn {
-            background-color: #6b7280;
+        .btn-voltar {
+            background-color: #dee2e6;
+            color: #333;
+            text-decoration: none;
+            padding: 10px 18px;
+            border-radius: 6px;
         }
-        .back-btn:hover {
-            background-color: #4b5563;
+        .erro {
+            margin-top: 15px;
+            color: red;
+            font-weight: bold;
         }
-        .mensagem {
-            font-size: 14px;
-            color: #059669;
-            font-weight: 600;
-            text-align: center;
-        }
-        footer {
-            position: fixed;
-            bottom: 10px;
-            right: 20px;
-            font-size: 12px;
-            color: #9ca3af;
+        .botoes {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            justify-content: flex-end;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Apontamento da OP: {{ op.CODIGO_OP }}</h1>
-        <div class="info">
-            <p><strong>Produto:</strong> {{ op.NOME_PRODUTO }}</p>
-            <p><strong>Espécie:</strong> {{ op.ESPECIE }}</p>
-            <p><strong>Subespécie:</strong> {{ op.SUB_ESPECIE }}</p>
-            <p><strong>ID Produto:</strong> {{ op.ID_PRODUTO }}</p>
-            <p><strong>Data Prevista:</strong> {{ op.DATA_PREVISTA.strftime('%d/%m/%Y') if op.DATA_PREVISTA }}</p>
-            <p><strong>Quantidade Prevista:</strong> {{ op.QTD_PREVISTA }}</p>
-            <p><strong>Quantidade Registrada:</strong> <span id="qtd-registrada">{{ qtd_registrada }}</span></p>
-        </div>
+        <h2>Conferência de Produção - Leitura</h2>
 
-        <form class="actions" id="form-registro">
-            <label for="codigo">Leitura de Código de Barras:</label>
-            <input type="text" id="codigo" name="codigo_barras" placeholder="Escaneie o código de barras...">
-            <button type="submit">Registrar</button>
-            <div class="mensagem" id="mensagem"></div>
-            <button type="button" class="back-btn" onclick="window.history.back()">Voltar</button>
+        <div class="produto">{{ produto or "None" }}</div>
+
+        <div class="info">Quantidade Prevista: {{ quantidade_prevista or 0 }}</div>
+        <div class="info">Quantidade Registrada: {{ quantidade_registrada or 0 }}</div>
+
+        <form method="post" action="/op/{{ op }}/registrar" id="form-leitura">
+            <label for="codigo_barras">Código de Barras:</label>
+            <input type="text" id="codigo_barras" name="codigo_barras" autofocus autocomplete="off">
+            <div class="botoes">
+                <a href="/admin" class="btn-voltar">← Voltar</a>
+                <button type="submit" class="btn-registrar">Registrar</button>
+            </div>
         </form>
+
+        {% if erro %}
+        <div class="erro">⚠️ {{ erro }}</div>
+        {% endif %}
     </div>
 
-    <footer>
-        Programa criado em 05/2025 by Sandro Torres — Autorizado uso e acesso por Marjom
-    </footer>
-
     <script>
-        const input = document.getElementById("codigo");
-        const form = document.getElementById("form-registro");
-        const msg = document.getElementById("mensagem");
-        const qtdSpan = document.getElementById("qtd-registrada");
-        const codigoEsperado = "{{ op.CODIGO_BARRAS }}".trim();
-        let timeoutAutoRegistro;
-
-        input.focus();
-
-        async function registrarLeitura(codigo) {
-            if (!codigo || codigo.length !== 13) return;
-
-            if (codigo.trim() !== codigoEsperado) {
-                msg.innerText = "⚠️ Código inválido para esta OP.";
-                msg.style.color = "#dc2626";
-                input.value = "";
-                input.focus();
-                return;
+        const input = document.getElementById('codigo_barras');
+        input.addEventListener('input', function () {
+            if (input.value.length === 13) {
+                document.getElementById('form-leitura').submit();
             }
-
-            const t0 = performance.now();
-            const resposta = await fetch("/api/registrar_leitura", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    cod_op: "{{ op.CODIGO_OP }}",
-                    codigo_barras: codigo,
-                    nome_produto: "{{ op.NOME_PRODUTO }}",
-                    especie: "{{ op.ESPECIE }}",
-                    sub_especie: "{{ op.SUB_ESPECIE }}",
-                    id_produto: "{{ op.ID_PRODUTO }}"
-                })
-            });
-            const t1 = performance.now();
-            console.log("⏱ tempoRegistro:", (t1 - t0).toFixed(2), "ms");
-
-            const result = await resposta.json();
-            msg.innerText = result.ok ? "✅ Registrado com sucesso!" : (result.erro || "❌ Falha no registro");
-            msg.style.color = result.ok ? "#059669" : "#dc2626";
-            input.value = "";
-            input.focus();
-
-            if (result.ok) {
-                qtdSpan.textContent = parseInt(qtdSpan.textContent) + 1;
-            }
-        }
-
-        input.addEventListener("input", () => {
-            clearTimeout(timeoutAutoRegistro);
-            const valor = input.value.trim();
-            if (valor.length === 13 && valor === codigoEsperado) {
-                timeoutAutoRegistro = setTimeout(() => registrarLeitura(valor), 1000);
-            }
-        });
-
-        input.addEventListener("keypress", function (e) {
-            if (e.key === "Enter") {
-                e.preventDefault();
-                clearTimeout(timeoutAutoRegistro);
-                registrarLeitura(input.value.trim());
-            }
-        });
-
-        form.addEventListener("submit", function (event) {
-            event.preventDefault();
-            clearTimeout(timeoutAutoRegistro);
-            registrarLeitura(input.value.trim());
         });
     </script>
 </body>

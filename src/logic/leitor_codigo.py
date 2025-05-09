@@ -1,80 +1,83 @@
-#src/logic/leitor_codigo.py
-import pandas as pd
 import os
+import pandas as pd
 from datetime import datetime
 
-# Caminho do arquivo CSV onde os registros das OPs são salvos
-REGISTROS_CSV_PATH = os.path.join(os.path.dirname(__file__), '..', 'files', 'registros.csv')
+# Caminho do CSV de registros
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+REGISTROS_CSV_PATH = os.path.join(BASE_DIR, "..", "files", "registros.csv")
 
-def verificar_codigo_pertencente_op(codigo_barras, cod_op, dados_op=None):
-    """
-    Verifica se o código de barras pertence à OP selecionada.
-    """
-    try:
-        if not dados_op or not dados_op.get('CODIGO_BARRAS'):
-            print("[ERRO] Código de barras esperado não informado nos dados da OP.")
-            return False
+# Cache interno de códigos válidos por OP (para evitar reprocessar a cada leitura)
+CODIGOS_VALIDOS_CACHE = {}
 
-        codigo_barras_correto = str(dados_op['CODIGO_BARRAS']).strip()
-        codigo_barras_lido = str(codigo_barras).strip()
+def carregar_csv() -> pd.DataFrame:
+    if os.path.exists(REGISTROS_CSV_PATH):
+        df = pd.read_csv(REGISTROS_CSV_PATH, sep=",", dtype={"COD_OP": str, "COD_BARRAS": str})
+        return df
+    else:
+        return pd.DataFrame(columns=["COD_OP", "NOME_PRODUTO", "ESPECIE", "SUB_ESPECIE", "ID_PRODUTO",
+                                     "COD_BARRAS", "DATA_REGISTRO", "QTD"])
 
-        print(f"[DEBUG] Comparando código: lido='{codigo_barras_lido}' | esperado='{codigo_barras_correto}'")
+def salvar_csv(df: pd.DataFrame):
+    df.to_csv(REGISTROS_CSV_PATH, index=False)
 
-        if not codigo_barras_correto.isdigit() or not codigo_barras_lido.isdigit():
-            print("[ERRO] Código de barras inválido: contém caracteres não numéricos.")
-            return False
+def contar_registradas_op(codigo_op: str) -> int:
+    df = carregar_csv()
+    return df[df["COD_OP"] == str(codigo_op)].shape[0]
 
-        if len(codigo_barras_lido) != len(codigo_barras_correto):
-            print(f"[ERRO] Comprimento incorreto do código: {len(codigo_barras_lido)} (esperado {len(codigo_barras_correto)})")
-            return False
+def buscar_dados_op(codigo_op, df_ops=None):
+    """Retorna as informações da OP e registros associados"""
 
-        if codigo_barras_lido != codigo_barras_correto:
-            print(f"[ERRO] Código incorreto: {codigo_barras_lido} ≠ {codigo_barras_correto}")
-            return False
+    # Se não foi passado um DataFrame, carrega tudo
+    if df_ops is None:
+        from .consulta_ops import carregar_ops_intervalo
+        df_ops = carregar_ops_intervalo("2020-01-01", "2030-12-31")
 
-        print(f"[OK] Código válido: {codigo_barras_lido} pertence à OP {cod_op}.")
-        return True
+    df_ops["CODIGO_OP"] = df_ops["CODIGO_OP"].astype(str)
+    op_dados = df_ops[df_ops["CODIGO_OP"] == str(codigo_op)]
 
-    except Exception as e:
-        print(f"[ERRO] Falha ao verificar código de barras: {e}")
-        return False
+    if op_dados.empty:
+        return {}
 
-def registrar_leitura(codigo_barras, cod_op, dados_op=None):
-    """
-    Registra uma nova leitura como uma linha no CSV com QTD = 1.
-    """
-    try:
-        if not verificar_codigo_pertencente_op(codigo_barras, cod_op, dados_op):
-            print(f"[ERRO] Código de barras não registrado devido a falha na verificação.")
-            return False
+    op_info = op_dados.iloc[0].to_dict()
 
-        os.makedirs(os.path.dirname(REGISTROS_CSV_PATH), exist_ok=True)
+    return {
+        "nome_produto": op_info.get("NOME_PRODUTO"),
+        "qtd_prevista": int(op_info.get("QTD_PREVISTA", 0)),
+        "qtd_registrada": int(op_info.get("QTD_REGISTRADA", 0)),
+        "codigo_barras": op_info.get("CODIGO_BARRAS")
+    }
 
-        if not os.path.exists(REGISTROS_CSV_PATH):
-            registros_df = pd.DataFrame(columns=[
-                'COD_OP', 'NOME_PRODUTO', 'QTD', 'ESPECIE', 'SUB_ESPECIE',
-                'ID_PRODUTO', 'COD_BARRAS', 'DATA_REGISTRO'
-            ])
-        else:
-            registros_df = pd.read_csv(REGISTROS_CSV_PATH)
+def registrar_leitura(codigo_op: str, codigo_barras: str):
+    codigo_op = str(codigo_op).strip()
+    codigo_barras = str(codigo_barras).strip()
 
-        nova_linha = {
-            'COD_OP': cod_op,
-            'NOME_PRODUTO': dados_op.get('NOME_PRODUTO', 'Produto Não Identificado'),
-            'QTD': 1,
-            'ESPECIE': dados_op.get('ESPECIE', 'Não Especificado'),
-            'SUB_ESPECIE': dados_op.get('SUB_ESPECIE', 'Não Especificado'),
-            'ID_PRODUTO': dados_op.get('ID_PRODUTO', 0),
-            'COD_BARRAS': str(codigo_barras).strip(),
-            'DATA_REGISTRO': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        }
+    # Garante que a lista de códigos válidos esteja em cache
+    if codigo_op not in CODIGOS_VALIDOS_CACHE:
+        buscar_dados_op(codigo_op)
 
-        registros_df = pd.concat([registros_df, pd.DataFrame([nova_linha])], ignore_index=True)
+    codigos_validos = CODIGOS_VALIDOS_CACHE.get(codigo_op, [])
+    if codigo_barras not in codigos_validos:
+        raise ValueError("Código de barras inválido para esta OP")
 
-        registros_df.to_csv(REGISTROS_CSV_PATH, index=False)
-        print(f"[OK] Leitura registrada: OP {cod_op} | Código: {codigo_barras} | QTD: 1")
-        return True
+    df = carregar_csv()
 
-    except Exception as e:
-        print(f"[ERRO] Falha ao registrar leitura: {e}")
-        return False
+    # Busca os dados da OP no próprio DataFrame
+    df_op = df[df["COD_OP"] == codigo_op]
+    if df_op.empty:
+        raise ValueError("Dados da OP não encontrados no CSV")
+
+    dados_op = df_op.iloc[0]
+
+    novo_registro = {
+        "COD_OP": codigo_op,
+        "NOME_PRODUTO": dados_op["NOME_PRODUTO"],
+        "ESPECIE": dados_op["ESPECIE"],
+        "SUB_ESPECIE": dados_op["SUB_ESPECIE"],
+        "ID_PRODUTO": dados_op["ID_PRODUTO"],
+        "COD_BARRAS": codigo_barras,
+        "DATA_REGISTRO": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "QTD": 1
+    }
+
+    df = pd.concat([df, pd.DataFrame([novo_registro])], ignore_index=True)
+    salvar_csv(df)

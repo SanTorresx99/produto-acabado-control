@@ -5,7 +5,25 @@ from src.database.conexao import conectar
 import pandas as pd
 import os
 
-REGISTROS_CSV_PATH = os.path.join(os.path.dirname(__file__), "..", "registros.csv")
+REGISTROS_CSV_PATH = os.path.join(os.path.dirname(__file__), "..", "files", "registros.csv")
+
+def contabilizar_registros_csv() -> pd.DataFrame:
+    """
+    Lê registros.csv e retorna um DataFrame com QTD total por CODIGO_OP.
+    """
+    if not os.path.exists(REGISTROS_CSV_PATH):
+        print("[INFO] registros.csv não encontrado.")
+        return pd.DataFrame(columns=["CODIGO_OP", "QTD_REGISTRADA"])
+
+    registros = pd.read_csv(REGISTROS_CSV_PATH, sep=",")
+    registros["COD_OP"] = registros["COD_OP"].astype(str).str.strip()
+    registros["QTD"] = registros["QTD"].fillna(0).astype(int)
+
+    soma = registros.groupby("COD_OP")["QTD"].sum().reset_index()
+    soma.columns = ["CODIGO_OP", "QTD_REGISTRADA"]
+    soma["CODIGO_OP"] = soma["CODIGO_OP"].astype(str)
+    return soma
+
 
 def carregar_ops_intervalo(data_inicio: str, data_fim: str, codigos_op: list[str] = None, tipo_op: str = "ambos") -> pd.DataFrame:
     conn = conectar()
@@ -79,19 +97,11 @@ def carregar_ops_intervalo(data_inicio: str, data_fim: str, codigos_op: list[str
         dfs = [pd.read_sql(q, conn) for q in queries]
         df_final = pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
 
-        # Enriquecimento com registros.csv
-        if os.path.exists(REGISTROS_CSV_PATH):
-            registros = pd.read_csv(REGISTROS_CSV_PATH, sep=",")
-            registros["COD_OP"] = registros["COD_OP"].astype(str).str.strip()
-            soma_registrada = registros.groupby("COD_OP")["QTD"].sum().reset_index()
-            soma_registrada.columns = ["CODIGO_OP", "QTD_REGISTRADA"]
-            soma_registrada["CODIGO_OP"] = soma_registrada["CODIGO_OP"].astype(str)
+        df_final["CODIGO_OP"] = df_final["CODIGO_OP"].astype(str)
 
-            df_final["CODIGO_OP"] = df_final["CODIGO_OP"].astype(str)
-            df_final = df_final.merge(soma_registrada, on="CODIGO_OP", how="left")
-        else:
-            df_final["QTD_REGISTRADA"] = 0
-
+        # 🔄 Integra registros do CSV
+        registros = contabilizar_registros_csv()
+        df_final = df_final.merge(registros, on="CODIGO_OP", how="left")
         df_final["QTD_REGISTRADA"] = df_final["QTD_REGISTRADA"].fillna(0).astype(int)
         df_final["STATUS"] = df_final["QTD_REGISTRADA"].apply(lambda x: "Registrado" if x > 0 else "")
 
@@ -103,6 +113,7 @@ def carregar_ops_intervalo(data_inicio: str, data_fim: str, codigos_op: list[str
         return pd.DataFrame()
     finally:
         conn.close()
+
 
 def filtrar_ops_por_esp_especie(df: pd.DataFrame, especie_escolhida: str, subesp_escolhida: str) -> pd.DataFrame:
     if especie_escolhida and especie_escolhida.lower() != "todas":
