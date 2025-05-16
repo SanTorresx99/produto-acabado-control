@@ -1,3 +1,4 @@
+#src/logic/consulta_ops.py
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -5,7 +6,7 @@ from src.database.conexao import conectar
 import pandas as pd
 import os
 
-REGISTROS_CSV_PATH = os.path.join(os.path.dirname(__file__), "..", "registros.csv")
+REGISTROS_CSV_PATH = os.path.join(os.path.dirname(__file__), "..","files", "registros.csv")
 
 def carregar_ops_intervalo(data_inicio: str, data_fim: str, codigos_op: list[str] = None, tipo_op: str = "ambos") -> pd.DataFrame:
     conn = conectar()
@@ -83,12 +84,18 @@ def carregar_ops_intervalo(data_inicio: str, data_fim: str, codigos_op: list[str
         if os.path.exists(REGISTROS_CSV_PATH):
             registros = pd.read_csv(REGISTROS_CSV_PATH, sep=",")
             registros["COD_OP"] = registros["COD_OP"].astype(str).str.strip()
+
+            # 🔧 Corrige valores ausentes ou inválidos na coluna QTD
+            registros["QTD"] = pd.to_numeric(registros["QTD"], errors="coerce").fillna(1).astype(int)
+
+            # Agrupamento após correção
             soma_registrada = registros.groupby("COD_OP")["QTD"].sum().reset_index()
             soma_registrada.columns = ["CODIGO_OP", "QTD_REGISTRADA"]
             soma_registrada["CODIGO_OP"] = soma_registrada["CODIGO_OP"].astype(str)
 
             df_final["CODIGO_OP"] = df_final["CODIGO_OP"].astype(str)
             df_final = df_final.merge(soma_registrada, on="CODIGO_OP", how="left")
+
         else:
             df_final["QTD_REGISTRADA"] = 0
 

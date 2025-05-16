@@ -10,13 +10,13 @@ import pandas as pd
 from src.logic.usuario import autenticar_usuario
 from src.logic.consulta_ops import carregar_ops_intervalo
 
-# 🔽 Load env
+# 🕽 Load env
 load_dotenv()
 
-# 🔽 Inicializa app
+# 🕽 Inicializa app
 app = FastAPI()
 
-# 🔽 Caminhos
+# 🕽 Caminhos
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "web", "templates"))
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "web", "static")), name="static")
@@ -37,7 +37,7 @@ async def processa_login(request: Request, login: str = Form(...), senha: str = 
     return templates.TemplateResponse("index.html", {"request": request, "erro": "Login inválido"})
 
 # ===========================
-# 🧾 Painel Admin
+# 📟 Painel Admin
 # ===========================
 @app.get("/admin", response_class=HTMLResponse)
 async def painel_admin(request: Request):
@@ -91,28 +91,6 @@ async def dados_ops(
             codigos = [c.strip() for c in cod_op.split(",")]
             df = df[df["CODIGO_OP"].astype(str).isin(codigos)]
 
-        # Carregar registros.csv
-        caminho_csv = os.path.join(BASE_DIR, "files", "registros.csv")
-        print(f"[INFO] Caminho do CSV: {caminho_csv}")
-        if os.path.exists(caminho_csv):
-            registros = pd.read_csv(caminho_csv, sep=",", dtype=str)
-            registros["QTD"] = registros["QTD"].astype(int)
-            registros["COD_OP"] = registros["COD_OP"].astype(str)
-            print(f"[INFO] {len(registros)} linhas lidas do CSV")
-
-            registros_agg = registros.groupby("COD_OP")["QTD"].sum().reset_index()
-            registros_agg.rename(columns={"QTD": "QTD_REGISTRADA"}, inplace=True)
-
-            df["CODIGO_OP"] = df["CODIGO_OP"].astype(str)
-            df = df.merge(registros_agg, left_on="CODIGO_OP", right_on="COD_OP", how="left")
-
-            if "QTD_REGISTRADA" not in df.columns:
-                df["QTD_REGISTRADA"] = 0
-            else:
-                df["QTD_REGISTRADA"] = df["QTD_REGISTRADA"].fillna(0).astype(int)
-        else:
-            df["QTD_REGISTRADA"] = 0
-
         ops = df.fillna(0).to_dict(orient="records")
         df = df.replace({pd.NA: None, float("nan"): 0})
         return {"ops": ops}
@@ -136,15 +114,8 @@ async def detalhe_op(request: Request, cod_op: str):
 
         op = df.iloc[0].to_dict()
 
-        # Quantidade registrada no CSV
-        qtd_registrada = 0
-        caminho_csv = os.path.join(BASE_DIR, "files", "registros.csv")
-        if os.path.exists(caminho_csv):
-            registros = pd.read_csv(caminho_csv, sep=",", dtype=str)
-            registros["QTD"] = registros["QTD"].astype(int)
-            registros["COD_OP"] = registros["COD_OP"].astype(str)
-            filtrado = registros[registros["COD_OP"] == cod_op]
-            qtd_registrada = filtrado["QTD"].sum() if not filtrado.empty else 0
+        # Quantidade registrada no CSV (pode ser omitido se já vier do df)
+        qtd_registrada = op.get("QTD_REGISTRADA", 0)
 
         return templates.TemplateResponse("op_detalhe.html", {
             "request": request,
