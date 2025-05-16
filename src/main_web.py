@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Form
+from fastapi import FastAPI, Request, Form, Body
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -106,7 +106,6 @@ async def dados_ops(
             df["CODIGO_OP"] = df["CODIGO_OP"].astype(str)
             df = df.merge(registros_agg, left_on="CODIGO_OP", right_on="COD_OP", how="left")
 
-            # Verificação robusta
             if "QTD_REGISTRADA" not in df.columns:
                 df["QTD_REGISTRADA"] = 0
             else:
@@ -120,4 +119,82 @@ async def dados_ops(
 
     except Exception as e:
         print("[ERRO] Falha em /api/ops:", e)
+        return JSONResponse(status_code=500, content={"erro": str(e)})
+
+# ===========================
+# 📄 Página Detalhe da OP
+# ===========================
+@app.get("/op/{cod_op}", response_class=HTMLResponse)
+async def detalhe_op(request: Request, cod_op: str):
+    try:
+        df = carregar_ops_intervalo("2025-01-01", "2025-12-31", tipo_op="ambos")
+        df.columns = df.columns.str.upper()
+        df = df[df["CODIGO_OP"].astype(str) == cod_op]
+
+        if df.empty:
+            return HTMLResponse(content=f"<h2>OP {cod_op} não encontrada.</h2>", status_code=404)
+
+        op = df.iloc[0].to_dict()
+
+        # Quantidade registrada no CSV
+        qtd_registrada = 0
+        caminho_csv = os.path.join(BASE_DIR, "files", "registros.csv")
+        if os.path.exists(caminho_csv):
+            registros = pd.read_csv(caminho_csv, sep=",", dtype=str)
+            registros["QTD"] = registros["QTD"].astype(int)
+            registros["COD_OP"] = registros["COD_OP"].astype(str)
+            filtrado = registros[registros["COD_OP"] == cod_op]
+            qtd_registrada = filtrado["QTD"].sum() if not filtrado.empty else 0
+
+        return templates.TemplateResponse("op_detalhe.html", {
+            "request": request,
+            "op": op,
+            "qtd_registrada": qtd_registrada
+        })
+
+    except Exception as e:
+        return HTMLResponse(content=f"<h2>Erro ao carregar OP: {str(e)}</h2>", status_code=500)
+
+# ===========================
+# 📥 API - Registrar leitura
+# ===========================
+@app.post("/api/registrar_leitura")
+async def registrar_leitura(payload: dict = Body(...)):
+    try:
+        cod_op = payload.get("cod_op")
+        codigo_barras = payload.get("codigo_barras")
+        nome_produto = payload.get("nome_produto")
+        especie = payload.get("especie")
+        sub_especie = payload.get("sub_especie")
+        id_produto = payload.get("id_produto")
+
+        if not all([cod_op, codigo_barras, nome_produto, especie, sub_especie, id_produto]):
+            return JSONResponse(status_code=400, content={"erro": "Dados incompletos"})
+
+        caminho_csv = os.path.join(BASE_DIR, "files", "registros.csv")
+
+        # Carrega registros existentes
+        if os.path.exists(caminho_csv):
+            df = pd.read_csv(caminho_csv, sep=",", dtype=str)
+        else:
+            df = pd.DataFrame(columns=["DATA", "COD_OP", "CODIGO_BARRAS", "ID_PRODUTO", "NOME_PRODUTO", "ESPECIE", "SUB_ESPECIE", "QTD"])
+
+        # Adiciona novo registro
+        novo_registro = {
+            "DATA": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "COD_OP": cod_op,
+            "CODIGO_BARRAS": codigo_barras,
+            "ID_PRODUTO": id_produto,
+            "NOME_PRODUTO": nome_produto,
+            "ESPECIE": especie,
+            "SUB_ESPECIE": sub_especie,
+            "QTD": "1"
+        }
+
+        df = pd.concat([df, pd.DataFrame([novo_registro])], ignore_index=True)
+        df.to_csv(caminho_csv, index=False, sep=",")
+
+        return {"ok": True}
+
+    except Exception as e:
         return JSONResponse(status_code=500, content={"erro": str(e)})
