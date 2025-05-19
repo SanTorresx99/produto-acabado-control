@@ -82,6 +82,19 @@ async def dados_ops(
         df.columns = df.columns.str.upper()
         print(f"[INFO] {len(df)} OPs carregadas")
 
+        # Regras de status customizadas
+        def classificar_status(row):
+            if row["QTD_REGISTRADA"] == 0:
+                return "🔴 Pendente"
+            elif row["QTD_REGISTRADA"] < row["QTD_PREVISTA"]:
+                return "✅ Registrando"
+            elif row["QTD_REGISTRADA"] == row["QTD_PREVISTA"]:
+                return "✅ Registro OK"
+            else:
+                return "⚠️ Registro a maior"
+
+        df["STATUS"] = df.apply(classificar_status, axis=1)
+
         # Filtros adicionais
         if subespecie.lower() != "todas":
             df = df[df["SUB_ESPECIE"].str.upper() == subespecie.upper()]
@@ -113,8 +126,6 @@ async def detalhe_op(request: Request, cod_op: str):
             return HTMLResponse(content=f"<h2>OP {cod_op} não encontrada.</h2>", status_code=404)
 
         op = df.iloc[0].to_dict()
-
-        # Quantidade registrada no CSV (pode ser omitido se já vier do df)
         qtd_registrada = op.get("QTD_REGISTRADA", 0)
 
         return templates.TemplateResponse("op_detalhe.html", {
@@ -130,7 +141,7 @@ async def detalhe_op(request: Request, cod_op: str):
 # 📥 API - Registrar leitura
 # ===========================
 @app.post("/api/registrar_leitura")
-async def registrar_leitura(payload: dict = Body(...)):
+async def registrar_leitura(request: Request, payload: dict = Body(...)):
     try:
         cod_op = payload.get("cod_op")
         codigo_barras = payload.get("codigo_barras")
@@ -139,18 +150,18 @@ async def registrar_leitura(payload: dict = Body(...)):
         sub_especie = payload.get("sub_especie")
         id_produto = payload.get("id_produto")
 
+        usuario = request.cookies.get("usuario")
+
         if not all([cod_op, codigo_barras, nome_produto, especie, sub_especie, id_produto]):
             return JSONResponse(status_code=400, content={"erro": "Dados incompletos"})
 
         caminho_csv = os.path.join(BASE_DIR, "files", "registros.csv")
 
-        # Carrega registros existentes
         if os.path.exists(caminho_csv):
             df = pd.read_csv(caminho_csv, sep=",", dtype=str)
         else:
-            df = pd.DataFrame(columns=["DATA", "COD_OP", "CODIGO_BARRAS", "ID_PRODUTO", "NOME_PRODUTO", "ESPECIE", "SUB_ESPECIE", "QTD"])
+            df = pd.DataFrame(columns=["DATA", "COD_OP", "CODIGO_BARRAS", "ID_PRODUTO", "NOME_PRODUTO", "ESPECIE", "SUB_ESPECIE", "QTD", "USUARIO"])
 
-        # Adiciona novo registro
         novo_registro = {
             "DATA": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "COD_OP": cod_op,
@@ -159,7 +170,8 @@ async def registrar_leitura(payload: dict = Body(...)):
             "NOME_PRODUTO": nome_produto,
             "ESPECIE": especie,
             "SUB_ESPECIE": sub_especie,
-            "QTD": "1"
+            "QTD": "1",
+            "USUARIO": usuario or "desconhecido"
         }
 
         df = pd.concat([df, pd.DataFrame([novo_registro])], ignore_index=True)

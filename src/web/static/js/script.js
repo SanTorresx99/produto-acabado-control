@@ -29,12 +29,50 @@ document.addEventListener("DOMContentLoaded", function () {
 
     dataInicioInput.value = formatarParaInput(inicioMes);
     dataFimInput.value = formatarParaInput(hoje);
+
+    flatpickr("#data-inicio", { dateFormat: "d/m/Y", locale: "pt" });
+    flatpickr("#data-fim", { dateFormat: "d/m/Y", locale: "pt" });
   }
 
   if (form) {
     form.addEventListener("submit", async function (event) {
       event.preventDefault();
+
+      const dataInicio = dataInicioInput.value;
+      const dataFim = dataFimInput.value;
+      const dInicio = new Date(formatarDataUSA(dataInicio));
+      const dFim = new Date(formatarDataUSA(dataFim));
+
+      if (dInicio > dFim) {
+        alert("A data de início não pode ser posterior à data de fim.");
+        return;
+      }
+
       await buscarDados();
+    });
+  }
+
+  function ordenarOps(ops) {
+    const prioridade = {
+      "⚠️ Registro a maior": 1,
+      "✅ Registro OK": 2,
+      "✅ Registrando": 3,
+      "🔴 Pendente": 4
+    };
+
+    return ops.sort((a, b) => {
+      const p1 = prioridade[a.STATUS] || 9;
+      const p2 = prioridade[b.STATUS] || 9;
+      if (p1 !== p2) return p1 - p2;
+
+      const sub1 = (a.SUB_ESPECIE || "").toUpperCase();
+      const sub2 = (b.SUB_ESPECIE || "").toUpperCase();
+      if (sub1 < sub2) return -1;
+      if (sub1 > sub2) return 1;
+
+      const id1 = parseInt(a.ID_PRODUTO || 0);
+      const id2 = parseInt(b.ID_PRODUTO || 0);
+      return id1 - id2;
     });
   }
 
@@ -62,8 +100,9 @@ document.addEventListener("DOMContentLoaded", function () {
       if (!response.ok) throw new Error(`Erro ${response.status}: ${response.statusText}`);
 
       const data = await response.json();
-      renderizarTabela(data.ops);
-      renderizarCards(calcularResumo(data.ops));
+      const ordenado = ordenarOps(data.ops);
+      renderizarTabela(ordenado);
+      renderizarCards(calcularResumo(ordenado));
     } catch (error) {
       console.error("Erro ao buscar dados:", error);
       tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: #dc2626">Erro ao carregar dados: ${error.message}</td></tr>`;
@@ -71,7 +110,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
-  function renderizarTabela(ops) {
+    function renderizarTabela(ops) {
     if (!tbody) return;
     tbody.innerHTML = "";
 
@@ -83,9 +122,14 @@ document.addEventListener("DOMContentLoaded", function () {
     ops.forEach((op) => {
       const tr = document.createElement("tr");
       tr.onclick = () => window.location.href = `/op/${op.CODIGO_OP}`;
-      const qtdReg = Number(op.QTD_REGISTRADA || 0);
-      const status = qtdReg > 0 ? "Registrado" : "Pendente";
-      const statusClass = qtdReg > 0 ? "status-registrado" : "status-pendente";
+
+      const status = op.STATUS || "";
+      let statusClass = "status-pendente";
+      if (status.includes("Registro OK")) statusClass = "status-ok";
+      else if (status.includes("Registrando")) statusClass = "status-parcial";
+      else if (status.includes("a maior")) statusClass = "status-maior";
+
+      const tipoIcone = op.TIPO_OP === "LIN_PROD" ? "🏭" : op.TIPO_OP === "SOB_ENC" ? "🪡" : "";
 
       tr.innerHTML = `
         <td class="${statusClass}">${status}</td>
@@ -95,8 +139,8 @@ document.addEventListener("DOMContentLoaded", function () {
         <td>${op.ESPECIE || ""}</td>
         <td>${op.SUB_ESPECIE || ""}</td>
         <td>${op.QTD_PREVISTA || 0}</td>
-        <td>${qtdReg}</td>
-        <td>${op.TIPO_OP || ""}</td>
+        <td>${op.QTD_REGISTRADA || 0}</td>
+        <td>${tipoIcone}</td>
       `;
       tbody.appendChild(tr);
     });
@@ -174,4 +218,6 @@ document.addEventListener("DOMContentLoaded", function () {
     carregarSubespecies();
     buscarDados();
   }
+
 });
+
